@@ -1,0 +1,29 @@
+{
+  "name": "tiktok-seeding",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "TikTok seeding platform — multi-machine GPM antidetect orchestration.",
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write .",
+    "db:generate": "pnpm --filter @app/master run db:generate",
+    "db:migrate": "pnpm --filter @app/master run db:migrate",
+    "db:studio": "pnpm --filter @app/master run db:studio",
+    "master": "pnpm --filter @app/master run dev",
+    "worker": "pnpm --filter @app/worker run dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

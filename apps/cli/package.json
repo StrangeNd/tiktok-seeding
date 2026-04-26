@@ -1,0 +1,20 @@
+{
+  "name": "@app/cli",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "sync-profiles": "tsx sync-profiles.ts",
+    "create-order": "tsx create-order.ts",
+    "list-orders": "tsx list-orders.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@app/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

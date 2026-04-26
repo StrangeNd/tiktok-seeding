@@ -1,0 +1,36 @@
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+pids/
+*.pid
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/settings.json
+
+# Test
+coverage/
+
+# Build cache
+.turbo/
+
+# Drizzle migrations meta (keep migration SQL, ignore generated meta)
+**/drizzle/meta/_journal.json.bak
+
+# Local DB dumps
+*.sql.bak
+*.dump

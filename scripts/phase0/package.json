@@ -1,0 +1,19 @@
+{
+  "name": "phase0-discovery",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Phase 0 - Discovery scripts: verify GPM Runtime API + Puppeteer CDP + benchmark 60 tabs.",
+  "scripts": {
+    "discover": "node discover.mjs",
+    "probe": "node probe.mjs",
+    "test:single": "node test-single.mjs",
+    "benchmark": "node benchmark.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

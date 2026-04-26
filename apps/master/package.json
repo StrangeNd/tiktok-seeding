@@ -1,0 +1,34 @@
+{
+  "name": "@app/master",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "db:generate": "dotenv -e ../../.env -- drizzle-kit generate",
+    "db:migrate": "dotenv -e ../../.env -- tsx src/db/migrate.ts",
+    "db:studio": "dotenv -e ../../.env -- drizzle-kit studio",
+    "db:push": "dotenv -e ../../.env -- drizzle-kit push"
+  },
+  "dependencies": {
+    "@app/gpm-client": "workspace:*",
+    "@app/shared": "workspace:*",
+    "@fastify/sensible": "^6.0.1",
+    "bullmq": "^5.21.2",
+    "drizzle-orm": "^0.36.1",
+    "fastify": "^5.1.0",
+    "ioredis": "^5.4.1",
+    "postgres": "^3.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "dotenv-cli": "^7.4.2",
+    "drizzle-kit": "^0.28.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}

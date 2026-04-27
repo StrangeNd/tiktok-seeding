@@ -87,7 +87,7 @@ else
 fi
 
 # Check for placeholder URLs in process env
-for VAR_NAME in DATABASE_URL REDIS_URL GPM_BASE_URL; do
+for VAR_NAME in DATABASE_URL REDIS_URL GPM_ENDPOINT; do
   VAL="${!VAR_NAME:-}"
   if [ -n "$VAL" ] && echo "$VAL" | grep -qE '\.(invalid|example)\b|placeholder'; then
     warn "$VAR_NAME has placeholder value: $VAL"

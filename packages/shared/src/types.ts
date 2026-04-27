@@ -2,13 +2,7 @@
 
 export type JobType = 'live_view'; // Phase 1: chỉ live view; Phase 2+ sẽ thêm comment, like, ...
 
-export type JobStatus =
-  | 'pending'
-  | 'running'
-  | 'succeeded'
-  | 'failed'
-  | 'retrying'
-  | 'cancelled';
+export type JobStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'retrying' | 'cancelled';
 
 export type OrderStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 

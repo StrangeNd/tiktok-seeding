@@ -1,4 +1,4 @@
-import { and, eq, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
@@ -46,10 +46,7 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
       .set({ status: 'running', startedAt: drizzleSql`now()` })
       .where(
         and(
-          eq(
-            orders.id,
-            drizzleSql<number>`(select order_id from jobs where id = ${jobId})`,
-          ),
+          eq(orders.id, drizzleSql<number>`(select order_id from jobs where id = ${jobId})`),
           eq(orders.status, 'queued'),
         ),
       );

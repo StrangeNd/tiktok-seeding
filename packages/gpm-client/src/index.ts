@@ -1,4 +1,6 @@
 export { GPMClient } from './client.js';
+export { MockGPMClient } from './mock.js';
+export { createGPMClient, type GPMClientLike } from './factory.js';
 export { discoverGPM, type DiscoveryResult } from './discover.js';
 export type {
   GPMProfile,

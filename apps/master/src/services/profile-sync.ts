@@ -1,4 +1,4 @@
-import { GPMClient, type GPMProfile } from '@app/gpm-client';
+import { type GPMProfile, createGPMClient } from '@app/gpm-client';
 import { createLogger, loadEnv } from '@app/shared';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -12,7 +12,7 @@ const env = loadEnv();
  * Idempotent: gọi lại sẽ refresh metadata, không tạo trùng.
  */
 export async function syncProfilesFromGpm(): Promise<{ total: number; upserted: number }> {
-  const gpm = new GPMClient({
+  const gpm = createGPMClient(env.GPM_MODE, {
     baseUrl: env.GPM_ENDPOINT,
     prefix: env.GPM_API_PREFIX,
     apiKey: env.GPM_API_KEY,

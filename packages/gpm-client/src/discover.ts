@@ -26,8 +26,7 @@ async function probeBanner(baseUrl: string): Promise<BannerData | null> {
     const senderStr = String(banner.sender ?? '');
     const dataStr = String(banner.data ?? '');
     const isGpm =
-      senderStr.toLowerCase().includes('gpmlogin') ||
-      dataStr.toLowerCase().includes('gpmlogin');
+      senderStr.toLowerCase().includes('gpmlogin') || dataStr.toLowerCase().includes('gpmlogin');
     if (!isGpm) return null;
     return {
       sender: banner.sender,
@@ -42,11 +41,13 @@ async function probeBanner(baseUrl: string): Promise<BannerData | null> {
  * Tìm GPMLoginGlobal Local API endpoint đang chạy trên máy.
  * Probe banner "/" trên các port phổ biến → verify list endpoint trả pagination chuẩn.
  */
-export async function discoverGPM(opts: {
-  hosts?: readonly string[];
-  ports?: readonly number[];
-  apiKey?: string;
-} = {}): Promise<DiscoveryResult | null> {
+export async function discoverGPM(
+  opts: {
+    hosts?: readonly string[];
+    ports?: readonly number[];
+    apiKey?: string;
+  } = {},
+): Promise<DiscoveryResult | null> {
   const hosts = opts.hosts ?? DEFAULT_HOSTS;
   const ports = opts.ports ?? DEFAULT_PORTS;
   const headers: Record<string, string> = {};

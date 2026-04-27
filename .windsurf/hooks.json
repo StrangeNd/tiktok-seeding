@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "post_setup_worktree": [
+      {
+        "command": "powershell -ExecutionPolicy Bypass -File \"$ROOT_WORKSPACE_PATH\\hooks\\setup-worktree.ps1\"",
+        "show_output": true
+      }
+    ]
+  }
+}

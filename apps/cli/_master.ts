@@ -7,18 +7,36 @@ export async function masterFetch(path: string, init: RequestInit = {}): Promise
   const method = (init.method ?? 'GET').toUpperCase();
   const needsBody = method === 'POST' || method === 'PUT' || method === 'PATCH';
   const body = init.body ?? (needsBody ? '{}' : undefined);
-  const r = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    body,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-API-Key': env.MASTER_API_KEY,
-      ...(init.headers ?? {}),
-    },
-  });
+
+  let r: Response;
+  try {
+    r = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      body,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': env.MASTER_API_KEY,
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('ECONNREFUSED') || msg.includes('fetch failed')) {
+      console.error(`\nERROR: Cannot reach master at ${baseUrl}`);
+      console.error('Is the master running? Start it with: pnpm master');
+      console.error(`Check: curl ${baseUrl}/health\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+
   if (!r.ok) {
     const text = await r.text();
-    throw new Error(`${init.method ?? 'GET'} ${path} HTTP ${r.status}: ${text}`);
+    if (r.status === 401) {
+      console.error('\nERROR: Unauthorized (HTTP 401). Check MASTER_API_KEY in .env');
+      process.exit(1);
+    }
+    throw new Error(`${method} ${path} HTTP ${r.status}: ${text}`);
   }
   return r;
 }

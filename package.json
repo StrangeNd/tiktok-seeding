@@ -14,7 +14,12 @@
     "db:migrate": "pnpm --filter @app/master run db:migrate",
     "db:studio": "pnpm --filter @app/master run db:studio",
     "master": "pnpm --filter @app/master run dev",
-    "worker": "pnpm --filter @app/worker run dev"
+    "worker": "pnpm --filter @app/worker run dev",
+    "sync": "pnpm --filter @app/cli run sync-profiles",
+    "order": "pnpm --filter @app/cli run create-order --",
+    "orders": "pnpm --filter @app/cli run list-orders --",
+    "doctor": "bash scripts/doctor.sh",
+    "smoke": "bash scripts/smoke-test.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

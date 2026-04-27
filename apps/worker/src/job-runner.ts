@@ -1,12 +1,13 @@
-import { GPMClient, GPMProfileInUseError } from '@app/gpm-client';
+import { GPMProfileInUseError, createGPMClient } from '@app/gpm-client';
 import { ErrorCode, type JobPayload, type JobResult, createLogger, loadEnv } from '@app/shared';
 import { liveView } from '@app/tiktok-actions';
 import puppeteer, { type Browser } from 'puppeteer-core';
 
 const env = loadEnv();
 const log = createLogger('job-runner');
+const isMock = env.GPM_MODE === 'mock';
 
-const gpm = new GPMClient({
+const gpm = createGPMClient(env.GPM_MODE, {
   baseUrl: env.GPM_ENDPOINT,
   prefix: env.GPM_API_PREFIX,
   apiKey: env.GPM_API_KEY,
@@ -17,10 +18,33 @@ export interface RunJobOptions {
 }
 
 /**
+ * Mock implementation: skip GPM + Puppeteer, return synthetic success.
+ */
+async function runMockJob(payload: JobPayload): Promise<JobResult> {
+  const t0 = Date.now();
+  log.info({ jobId: payload.jobId, profileId: payload.profileId }, 'Mock job — simulating');
+  await gpm.startProfile(payload.profileId);
+  // Simulate a short watch
+  const watchMs = Math.min(payload.watchSeconds, 2) * 1000;
+  await new Promise((r) => setTimeout(r, watchMs));
+  await gpm.closeProfile(payload.profileId);
+  return {
+    ok: true,
+    durationMs: Date.now() - t0,
+    notes: `mock nav=0ms watched=${Math.min(payload.watchSeconds, 2)}s`,
+  };
+}
+
+/**
  * Chạy 1 job live_view: start GPM profile → connect Puppeteer → action → cleanup.
  * Idempotent ở mức cleanup: dù lỗi giữa chừng vẫn cố gọi closeProfile.
  */
-export async function runLiveViewJob(payload: JobPayload, opts: RunJobOptions = {}): Promise<JobResult> {
+export async function runLiveViewJob(
+  payload: JobPayload,
+  opts: RunJobOptions = {},
+): Promise<JobResult> {
+  if (isMock) return runMockJob(payload);
+
   const t0 = Date.now();
   let browser: Browser | null = null;
   let profileStarted = false;
@@ -30,7 +54,12 @@ export async function runLiveViewJob(payload: JobPayload, opts: RunJobOptions = 
     const started = await gpm.startProfile(payload.profileId);
     profileStarted = true;
     log.debug(
-      { jobId: payload.jobId, profileId: payload.profileId, port: started.port, pid: started.processId },
+      {
+        jobId: payload.jobId,
+        profileId: payload.profileId,
+        port: started.port,
+        pid: started.processId,
+      },
       'Profile started',
     );
 

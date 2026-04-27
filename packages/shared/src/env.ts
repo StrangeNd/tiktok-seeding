@@ -28,9 +28,7 @@ autoLoadDotenv();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   // ─── Master ───
   MASTER_PORT: z.coerce.number().int().min(1).max(65535).default(7000),
@@ -43,6 +41,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url(),
 
   // ─── GPM Login Global API (Phase 0 verified) ───
+  GPM_MODE: z.enum(['live', 'mock']).default('live'),
   GPM_ENDPOINT: z.string().url().default('http://127.0.0.1:9495'),
   GPM_API_PREFIX: z.string().default('/api/v1'),
   GPM_API_KEY: z.string().optional(),

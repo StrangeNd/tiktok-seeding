@@ -88,9 +88,7 @@ export const workers = pgTable('workers', {
   capacity: integer('capacity').notNull().default(0),
   currentLoad: integer('current_load').notNull().default(0),
   version: text('version'),
-  lastSeenAt: timestamp('last_seen_at', { withTimezone: true })
-    .notNull()
-    .default(sql`now()`),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().default(sql`now()`),
 });
 
 // Helper types ─ Drizzle infer từ schema

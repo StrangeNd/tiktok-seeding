@@ -1,5 +1,5 @@
 import { type JobPayload, createLogger, loadEnv } from '@app/shared';
-import { Worker as BullWorker, type Job as BullJob } from 'bullmq';
+import { type Job as BullJob, Worker as BullWorker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { runLiveViewJob } from './job-runner.js';
 import { reportJobFinish, reportJobStart, sendHeartbeat } from './master-client.js';
@@ -18,10 +18,7 @@ const bullWorker = new BullWorker<JobPayload>(
     activeJobs += 1;
     const attempt = job.attemptsMade;
     const maxAttempts = job.opts.attempts ?? 1;
-    log.info(
-      { jobId: job.data.jobId, profileId: job.data.profileId, attempt },
-      'Job started',
-    );
+    log.info({ jobId: job.data.jobId, profileId: job.data.profileId, attempt }, 'Job started');
     await reportJobStart({
       jobId: job.data.jobId,
       workerName: env.WORKER_NAME,
@@ -65,10 +62,7 @@ const bullWorker = new BullWorker<JobPayload>(
 );
 
 bullWorker.on('failed', (job, err) => {
-  log.warn(
-    { jobId: job?.data.jobId, attempts: job?.attemptsMade, err: err.message },
-    'Job failed',
-  );
+  log.warn({ jobId: job?.data.jobId, attempts: job?.attemptsMade, err: err.message }, 'Job failed');
 });
 
 bullWorker.on('error', (err) => {

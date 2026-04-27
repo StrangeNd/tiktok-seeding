@@ -1,5 +1,5 @@
-import { httpJson } from './http.js';
 import { GPMError, GPMProfileInUseError } from './errors.js';
+import { httpJson } from './http.js';
 import type {
   GPMApiResponse,
   GPMListProfilesParams,
@@ -104,7 +104,8 @@ export class GPMClient {
     if (options.windowSize) qs.set('window_size', options.windowSize);
     if (options.additionArgs) qs.set('addition_args', options.additionArgs);
     const queryStr = qs.toString();
-    const url = this.url(`/profiles/start/${encodeURIComponent(id)}`) + (queryStr ? `?${queryStr}` : '');
+    const url =
+      this.url(`/profiles/start/${encodeURIComponent(id)}`) + (queryStr ? `?${queryStr}` : '');
 
     const r = await httpJson<GPMApiResponse<GPMStartProfileRawData>>(url, {
       method: 'GET',
@@ -154,7 +155,11 @@ export class GPMClient {
       this.url(`/profiles/stop/${encodeURIComponent(id)}`),
       { method: 'GET', headers: this.headers, timeoutMs: 30_000 },
     );
-    if (!r.body || typeof r.body !== 'object' || (r.body as GPMApiResponse<string>).data === 'GPMLogin Global API') {
+    if (
+      !r.body ||
+      typeof r.body !== 'object' ||
+      (r.body as GPMApiResponse<string>).data === 'GPMLogin Global API'
+    ) {
       throw new GPMError('closeProfile: invalid response (banner)', { raw: r.body });
     }
     return { alreadyClosed: !r.body.success };

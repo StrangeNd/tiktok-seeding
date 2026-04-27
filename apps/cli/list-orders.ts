@@ -54,7 +54,9 @@ if (args.id) {
   const r = await masterFetch(`/orders/${args.id}`);
   const data = (await r.json()) as { order: OrderRow; jobs: JobRow[] };
   const o = data.order;
-  console.log(`Order #${o.id} — ${o.status} — ${o.completedJobs}/${o.count} done, ${o.failedJobs} fail`);
+  console.log(
+    `Order #${o.id} — ${o.status} — ${o.completedJobs}/${o.count} done, ${o.failedJobs} fail`,
+  );
   console.log(`  type:     ${o.type}`);
   console.log(`  url:      ${o.targetUrl}`);
   console.log(`  watch:    ${o.watchSeconds}s`);

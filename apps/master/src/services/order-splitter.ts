@@ -20,9 +20,7 @@ export interface DispatchResult {
  * Lease dùng `SELECT ... FOR UPDATE SKIP LOCKED` trong transaction
  * → an toàn khi có nhiều API request tạo order cùng lúc.
  */
-export async function createOrderAndDispatch(
-  payload: CreateOrderPayload,
-): Promise<DispatchResult> {
+export async function createOrderAndDispatch(payload: CreateOrderPayload): Promise<DispatchResult> {
   const { orderId, jobRows, shortage } = await db.transaction(async (tx) => {
     // 1. Lease N profile available, lock SKIP LOCKED để concurrent calls không đụng nhau
     const candidates = await tx
@@ -95,10 +93,7 @@ export async function createOrderAndDispatch(
 
   await liveViewQueue.addBulk(bullJobs);
 
-  log.info(
-    { orderId, jobs: jobRows.length, shortage },
-    'Order dispatched',
-  );
+  log.info({ orderId, jobs: jobRows.length, shortage }, 'Order dispatched');
 
   return {
     orderId,

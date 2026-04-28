@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Smoke test: typecheck, DB migration, service startup, profile sync, small order.
 # Runs in mock GPM mode by default. Pass GPM_MODE=live to test against real GPM.
-# Usage: bash scripts/smoke-test.sh
+# Usage: bash scripts/smoke-test.sh   OR   pnpm smoke
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
-# Local overrides — safe for CI / Devin cloud
+# Local overrides — safe for CI / Devin cloud.
+# Explicitly set to avoid placeholder secrets from cloud platforms.
 export DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:5432/seeding}"
 export REDIS_URL="${REDIS_URL:-redis://127.0.0.1:6379}"
 export GPM_MODE="${GPM_MODE:-mock}"
@@ -19,6 +20,19 @@ export WORKER_NAME="${WORKER_NAME:-worker-smoke}"
 export CONCURRENCY="${CONCURRENCY:-2}"
 export NODE_ENV=development
 export LOG_LEVEL=info
+
+# Fix placeholder URLs from session secrets
+for VAR in DATABASE_URL REDIS_URL GPM_ENDPOINT GPM_BASE_URL; do
+  VAL="${!VAR:-}"
+  if echo "$VAL" | grep -qE '\.(invalid|example)\b|placeholder' 2>/dev/null; then
+    case "$VAR" in
+      DATABASE_URL) export DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/seeding" ;;
+      REDIS_URL)    export REDIS_URL="redis://127.0.0.1:6379" ;;
+      GPM_ENDPOINT) export GPM_ENDPOINT="http://127.0.0.1:19500" ;;
+      GPM_BASE_URL) export GPM_BASE_URL="http://127.0.0.1:19500" ;;
+    esac
+  fi
+done
 
 PASS=0
 FAIL=0
@@ -43,7 +57,7 @@ echo "--- Step 1: Typecheck ---"
 if pnpm typecheck >/dev/null 2>&1; then
   step_ok "typecheck"
 else
-  step_fail "typecheck"
+  step_fail "typecheck (run 'pnpm typecheck' to see errors)"
 fi
 
 # ── Step 2: DB migration ──────────────────────────────────────────
@@ -64,11 +78,20 @@ if curl -sf http://127.0.0.1:"$MASTER_PORT"/health > /dev/null 2>&1; then
   step_ok "master started (PID $MASTER_PID)"
 else
   step_fail "master start (check /tmp/master.log)"
-  cat /tmp/master.log | tail -20
+  tail -20 /tmp/master.log
 fi
 
-# ── Step 4: Profile sync ──────────────────────────────────────────
-echo "--- Step 4: Profile sync ---"
+# ── Step 4: Deep health check ─────────────────────────────────────
+echo "--- Step 4: Deep health check ---"
+DEEP_OUT=$(curl -sf http://127.0.0.1:"$MASTER_PORT"/health/deep 2>&1) || true
+if echo "$DEEP_OUT" | grep -q '"ok":true'; then
+  step_ok "deep health (postgres + redis OK)"
+else
+  step_fail "deep health: $DEEP_OUT"
+fi
+
+# ── Step 5: Profile sync ──────────────────────────────────────────
+echo "--- Step 5: Profile sync ---"
 SYNC_OUT=$(curl -sf -X POST \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MASTER_API_KEY" \
@@ -82,8 +105,8 @@ else
   step_fail "profile sync: $SYNC_OUT"
 fi
 
-# ── Step 5: Start worker ──────────────────────────────────────────
-echo "--- Step 5: Start worker ---"
+# ── Step 6: Start worker ──────────────────────────────────────────
+echo "--- Step 6: Start worker ---"
 pnpm --filter @app/worker run start > /tmp/worker.log 2>&1 &
 WORKER_PID=$!
 sleep 3
@@ -92,11 +115,11 @@ if kill -0 "$WORKER_PID" 2>/dev/null; then
   step_ok "worker started (PID $WORKER_PID)"
 else
   step_fail "worker start (check /tmp/worker.log)"
-  cat /tmp/worker.log | tail -20
+  tail -20 /tmp/worker.log
 fi
 
-# ── Step 6: Create a small order ───────────────────────────────────
-echo "--- Step 6: Create small order ---"
+# ── Step 7: Create a small order ───────────────────────────────────
+echo "--- Step 7: Create small order ---"
 ORDER_OUT=$(curl -sf -X POST \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $MASTER_API_KEY" \
@@ -110,9 +133,9 @@ else
   step_fail "create order: $ORDER_OUT"
 fi
 
-# ── Step 7: Wait for jobs to finish (mock mode should be fast) ────
+# ── Step 8: Wait for jobs to finish (mock mode should be fast) ────
 if [ "$GPM_MODE" = "mock" ] && [ -n "${ORDER_ID:-}" ]; then
-  echo "--- Step 7: Wait for mock jobs ---"
+  echo "--- Step 8: Wait for mock jobs ---"
   for i in $(seq 1 15); do
     sleep 2
     STATUS_OUT=$(curl -sf \
@@ -132,17 +155,18 @@ if [ "$GPM_MODE" = "mock" ] && [ -n "${ORDER_ID:-}" ]; then
     step_fail "order $ORDER_ID did not finish in time (status=${STATUS:-unknown})"
   fi
 else
-  echo "--- Step 7: Skipped (live mode or no order) ---"
+  echo "--- Step 8: Skipped (live mode or no order) ---"
 fi
 
-# ── Step 8: List orders ────────────────────────────────────────────
-echo "--- Step 8: List orders ---"
+# ── Step 9: List orders via CLI ────────────────────────────────────
+echo "--- Step 9: List orders ---"
 LIST_OUT=$(curl -sf \
   -H "X-API-Key: $MASTER_API_KEY" \
   http://127.0.0.1:"$MASTER_PORT"/orders 2>&1) || true
 
 if echo "$LIST_OUT" | grep -q '"orders"'; then
-  step_ok "list orders"
+  ORDER_COUNT=$(echo "$LIST_OUT" | grep -o '"id":[0-9]*' | wc -l)
+  step_ok "list orders ($ORDER_COUNT orders)"
 else
   step_fail "list orders: $LIST_OUT"
 fi
@@ -159,6 +183,7 @@ echo "  Passed: $PASS   Failed: $FAIL"
 if [ "$FAIL" -gt 0 ]; then
   echo ""
   echo "SMOKE TEST FAILED"
+  echo "Run 'pnpm doctor' to diagnose infrastructure issues."
   exit 1
 fi
 echo ""

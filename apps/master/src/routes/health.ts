@@ -1,9 +1,17 @@
+import { loadEnv } from '@app/shared';
 import type { FastifyInstance } from 'fastify';
 import { sql } from '../db/client.js';
 import { queueConnection } from '../queue.js';
 
+const env = loadEnv();
+
 export async function healthRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/health', async () => ({ ok: true, ts: new Date().toISOString() }));
+  app.get('/health', async () => ({
+    ok: true,
+    ts: new Date().toISOString(),
+    gpmMode: env.GPM_MODE,
+    version: '0.1.0',
+  }));
 
   app.get('/health/deep', async (_req, reply) => {
     const checks: Record<string, { ok: boolean; error?: string }> = {};
@@ -23,6 +31,11 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const allOk = Object.values(checks).every((c) => c.ok);
-    return reply.code(allOk ? 200 : 503).send({ ok: allOk, checks });
+    return reply.code(allOk ? 200 : 503).send({
+      ok: allOk,
+      gpmMode: env.GPM_MODE,
+      version: '0.1.0',
+      checks,
+    });
   });
 }

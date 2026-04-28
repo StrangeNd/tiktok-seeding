@@ -17,6 +17,12 @@ export interface RunJobOptions {
   signal?: AbortSignal;
 }
 
+/** Buffer added on top of `watchSeconds` for nav + cleanup before hard-timeout. */
+const HARD_TIMEOUT_BUFFER_SEC = 90;
+
+/** Puppeteer.connect has no built-in timeout; race it against this. */
+const PUPPETEER_CONNECT_TIMEOUT_MS = 30_000;
+
 /**
  * Mock implementation: skip GPM + Puppeteer, return synthetic success.
  */
@@ -36,8 +42,35 @@ async function runMockJob(payload: JobPayload): Promise<JobResult> {
 }
 
 /**
+ * Race a promise against a timeout. On timeout, signal abort and reject.
+ * The losing promise keeps running in background; caller's `finally` block must
+ * still own resource cleanup.
+ */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const tid = setTimeout(() => reject(new Error(`${label}_timeout`)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(tid);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(tid);
+        reject(e);
+      },
+    );
+  });
+}
+
+/**
  * Chạy 1 job live_view: start GPM profile → connect Puppeteer → action → cleanup.
  * Idempotent ở mức cleanup: dù lỗi giữa chừng vẫn cố gọi closeProfile.
+ *
+ * Defence in depth:
+ *   - Puppeteer.connect raced against PUPPETEER_CONNECT_TIMEOUT_MS.
+ *   - Whole job raced against hard timeout = (watchSeconds + buffer) seconds.
+ *     If hard timeout fires, AbortController triggers liveView's signal-aware
+ *     loop to bail; cleanup still runs in finally; result reported as JobTimeout.
  */
 export async function runLiveViewJob(
   payload: JobPayload,
@@ -46,6 +79,20 @@ export async function runLiveViewJob(
   if (isMock) return runMockJob(payload);
 
   const t0 = Date.now();
+  const hardTimeoutMs = (payload.watchSeconds + HARD_TIMEOUT_BUFFER_SEC) * 1000;
+
+  // Combine caller-provided signal (worker shutdown) with our hard-timeout signal.
+  const ac = new AbortController();
+  const onCallerAbort = () => ac.abort();
+  if (opts.signal) {
+    if (opts.signal.aborted) ac.abort();
+    else opts.signal.addEventListener('abort', onCallerAbort, { once: true });
+  }
+  const hardTimeoutHandle = setTimeout(() => {
+    log.warn({ jobId: payload.jobId, hardTimeoutMs }, 'Hard timeout fired, aborting job');
+    ac.abort();
+  }, hardTimeoutMs);
+
   let browser: Browser | null = null;
   let profileStarted = false;
 
@@ -63,11 +110,15 @@ export async function runLiveViewJob(
       'Profile started',
     );
 
-    // 2. Puppeteer connect
-    browser = await puppeteer.connect({
-      browserWSEndpoint: started.wsEndpoint,
-      defaultViewport: null,
-    });
+    // 2. Puppeteer connect with explicit timeout race
+    browser = await withTimeout(
+      puppeteer.connect({
+        browserWSEndpoint: started.wsEndpoint,
+        defaultViewport: null,
+      }),
+      PUPPETEER_CONNECT_TIMEOUT_MS,
+      'puppeteer_connect',
+    );
     const pages = await browser.pages();
     const page = pages[0] ?? (await browser.newPage());
 
@@ -75,8 +126,20 @@ export async function runLiveViewJob(
     const result = await liveView(page, {
       url: payload.targetUrl,
       watchSeconds: payload.watchSeconds,
-      signal: opts.signal,
+      signal: ac.signal,
     });
+
+    // If the hard timeout fired DURING liveView, the in-loop signal check
+    // returns ok:true with truncated watchedSeconds. Promote to JobTimeout.
+    if (ac.signal.aborted && !opts.signal?.aborted) {
+      return {
+        ok: false,
+        durationMs: Date.now() - t0,
+        error: `job exceeded hard timeout (${hardTimeoutMs}ms)`,
+        errorCode: ErrorCode.JobTimeout,
+        notes: `nav=${result.navMs}ms watched=${result.watchedSeconds}s`,
+      };
+    }
 
     if (!result.ok) {
       return {
@@ -103,6 +166,23 @@ export async function runLiveViewJob(
       };
     }
     const e = err as Error;
+    if (e.message === 'puppeteer_connect_timeout') {
+      log.warn({ jobId: payload.jobId }, 'Puppeteer connect timed out');
+      return {
+        ok: false,
+        durationMs: Date.now() - t0,
+        error: 'puppeteer connect timeout',
+        errorCode: ErrorCode.PuppeteerConnectFailed,
+      };
+    }
+    if (ac.signal.aborted && !opts.signal?.aborted) {
+      return {
+        ok: false,
+        durationMs: Date.now() - t0,
+        error: `job exceeded hard timeout (${hardTimeoutMs}ms): ${e.message}`,
+        errorCode: ErrorCode.JobTimeout,
+      };
+    }
     log.warn({ err, jobId: payload.jobId }, 'Job failed');
     return {
       ok: false,
@@ -111,6 +191,9 @@ export async function runLiveViewJob(
       errorCode: ErrorCode.Unknown,
     };
   } finally {
+    clearTimeout(hardTimeoutHandle);
+    if (opts.signal) opts.signal.removeEventListener('abort', onCallerAbort);
+
     // Cleanup: disconnect puppeteer trước, đợi 1s, rồi close profile.
     if (browser) {
       try {

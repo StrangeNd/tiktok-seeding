@@ -1,4 +1,5 @@
 import { createLogger, loadEnv } from '@app/shared';
+import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
 import { closeDb } from './db/client.js';
@@ -6,6 +7,7 @@ import { closeQueues } from './queue.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
 import { orderRoutes } from './routes/orders.js';
+import { profileRoutes } from './routes/profiles.js';
 import { workerRoutes } from './routes/workers.js';
 import { resetStuckProfiles } from './services/recovery.js';
 
@@ -20,6 +22,7 @@ const app = Fastify({
 
 // Sensible defaults: app.httpErrors helpers, ETag, etc.
 await app.register(sensible);
+await app.register(cors, { origin: true });
 
 // Simple API key middleware (Phase 1 single-key)
 app.addHook('onRequest', async (req, reply) => {
@@ -33,6 +36,7 @@ app.addHook('onRequest', async (req, reply) => {
 
 await app.register(healthRoutes);
 await app.register(orderRoutes);
+await app.register(profileRoutes);
 await app.register(workerRoutes);
 await app.register(jobRoutes);
 

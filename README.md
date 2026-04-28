@@ -1,5 +1,7 @@
 # TikTok Seeding Platform
 
+[![CI](https://github.com/StrangeNd/tiktok-seeding/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/StrangeNd/tiktok-seeding/actions/workflows/ci.yml)
+
 Bộ công cụ quản lý / nuôi tài khoản TikTok Việt Nam và cung cấp dịch vụ seeding (mắt live, comment, tim, click giỏ hàng, view video) trên hạ tầng **7 máy dual-Xeon + GPM antidetect browser**.
 
 > Đây là tài liệu khung (skeleton). Code thật sẽ được build theo các phase trong `docs/PLAN.md`.
@@ -53,7 +55,8 @@ tiktok-seeding/
 2. `docs/ARCHITECTURE.md` — luồng dữ liệu + tích hợp GPM.
 3. `docs/MODULES.md` — chi tiết từng module.
 4. `docs/SCHEMA.md` — DB schema.
-5. `docs/OPERATIONS.md` — vận hành cluster.
+5. `docs/OPERATIONS.md` — vận hành cluster (multi-machine).
+6. `docs/RUNBOOK_WINDOWS.md` — **operator runbook cho local Windows** (start/stop/status/recovery).
 
 ## Disclaimer
 

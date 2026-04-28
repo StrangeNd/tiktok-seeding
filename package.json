@@ -14,7 +14,13 @@
     "db:migrate": "pnpm --filter @app/master run db:migrate",
     "db:studio": "pnpm --filter @app/master run db:studio",
     "master": "pnpm --filter @app/master run dev",
-    "worker": "pnpm --filter @app/worker run dev"
+    "worker": "pnpm --filter @app/worker run dev",
+    "doctor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/doctor.ps1",
+    "start:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
+    "stop:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/stop.ps1",
+    "restart:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/restart.ps1",
+    "status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/status.ps1",
+    "reset:profiles": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/reset-profiles.ps1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

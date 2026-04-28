@@ -1,43 +1,27 @@
 name: CI
 
+# Runs the mock-GPM end-to-end smoke test on every push/PR.
+# Mirrors the workflow Devin Cloud already validated:
+#   typecheck → lint → db migrate → master + worker startup → mock job → done.
+#
+# Real-GPM / live-mode validation is local-Windows only and is not part of CI.
+
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+  workflow_dispatch:
 
+# Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Typecheck & Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint
-
   smoke:
-    name: Smoke Test
+    name: Mock smoke test (Ubuntu, Node 20)
     runs-on: ubuntu-latest
-    needs: check
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -48,11 +32,12 @@ jobs:
           POSTGRES_DB: seeding
         ports:
           - 5432:5432
+        # Health-check so the job waits for postgres to accept connections.
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U postgres -d seeding"
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
       redis:
         image: redis:7
@@ -62,26 +47,74 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
+
+    env:
+      # Match scripts/smoke-test.sh defaults; explicit so failures point at CI, not env drift.
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/seeding
+      REDIS_URL: redis://127.0.0.1:6379
+      GPM_MODE: mock
+      GPM_ENDPOINT: http://127.0.0.1:19500
+      GPM_API_PREFIX: /api/v1
+      MASTER_API_KEY: ci-key-change-me
+      MASTER_PORT: '7000'
+      WORKER_NAME: worker-ci
+      CONCURRENCY: '2'
+      NODE_ENV: development
+      LOG_LEVEL: info
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.0
+      - name: Enable corepack + pin pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.12.0 --activate
+          pnpm --version
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node 20 + pnpm cache
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Run smoke test
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Wait for Postgres + Redis
+        run: |
+          for i in $(seq 1 30); do
+            pg_ok=false
+            redis_ok=false
+            pg_isready -h 127.0.0.1 -U postgres -d seeding >/dev/null 2>&1 && pg_ok=true
+            (echo PING | nc -w 1 127.0.0.1 6379 | grep -q PONG) 2>/dev/null && redis_ok=true
+            if $pg_ok && $redis_ok; then
+              echo "services ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "services did not become ready in time"
+          exit 1
+
+      - name: Smoke test (mock GPM)
         run: bash scripts/smoke-test.sh
-        env:
-          DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/seeding
-          REDIS_URL: redis://127.0.0.1:6379
-          GPM_MODE: mock
-          MASTER_API_KEY: dev-key-change-me
+
+      - name: Upload service logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: |
+            /tmp/master.log
+            /tmp/worker.log
+          if-no-files-found: ignore
+          retention-days: 7

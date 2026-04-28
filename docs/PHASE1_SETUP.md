@@ -137,6 +137,23 @@ Concurrency thực tế:     ___  (so với CONCURRENCY=5 trong .env)
 | Worker error `ProfileInUse` liên tục | GPM giữ lock từ run trước | Đóng tab thủ công trong GPM hoặc đợi 60s |
 | Job failed `NavigationTimeout` | TikTok proxy chậm hoặc VPN sai region | Tăng `navTimeoutMs` trong `live-view.ts`, hoặc thử URL khác |
 
+## 7.1 Operator scripts (recommended day-to-day)
+
+After the manual flow above works once, prefer the operator scripts:
+
+```powershell
+pnpm doctor          # pre-flight all dependencies
+pnpm start:all       # start master + worker (detached, logs in .runtime/)
+pnpm status          # health/heartbeat/profile pool/recent logs
+pnpm stop:all        # graceful shutdown scoped to this worktree
+pnpm restart:all     # stop + start
+pnpm reset:profiles  # release stuck in_use profiles
+```
+
+See `docs/RUNBOOK_WINDOWS.md` for the full local Windows operator runbook,
+including crash recovery (orphan profile reset, hard job timeout) and
+troubleshooting matrix.
+
 ## 8. Sau khi pass → Phase 2
 
 Phase 2 thêm:

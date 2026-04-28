@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { jobs, orders } from '../db/schema.js';
 import { createOrderAndDispatch } from '../services/order-splitter.js';
 import { syncProfilesFromGpm } from '../services/profile-sync.js';
+import { resetStuckProfiles } from '../services/recovery.js';
 
 const createOrderSchema = z.object({
   type: z.literal('live_view'), // Phase 1
@@ -69,6 +70,17 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       return result;
     } catch (e) {
       return reply.code(500).send({ error: 'sync_failed', message: (e as Error).message });
+    }
+  });
+
+  // POST /admin/reset-stuck-profiles — release in_use profiles whose jobs are all terminal.
+  // Idempotent. Safe to run while workers are active (only touches stranded rows).
+  app.post('/admin/reset-stuck-profiles', async (_req, reply) => {
+    try {
+      const result = await resetStuckProfiles();
+      return result;
+    } catch (e) {
+      return reply.code(500).send({ error: 'reset_failed', message: (e as Error).message });
     }
   });
 }

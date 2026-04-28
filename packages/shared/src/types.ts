@@ -58,6 +58,8 @@ export const ErrorCode = {
   TikTokCaptcha: 'TikTokCaptcha',
   AccountLoggedOut: 'AccountLoggedOut',
   ProxyDead: 'ProxyDead',
+  /** Job exceeded overall hard timeout (watchSeconds + nav + cleanup buffer). */
+  JobTimeout: 'JobTimeout',
   Unknown: 'Unknown',
 } as const;
 

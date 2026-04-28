@@ -69,6 +69,7 @@ From repo root:
 ```bash
 pnpm master          # Start Fastify API on :7000
 pnpm worker          # Start BullMQ worker (connects to master + Redis)
+pnpm dashboard       # Start dashboard UI on :3000 (proxies API to :7000)
 ```
 
 Or with pnpm filter:
@@ -121,6 +122,7 @@ tiktok-seeding/
 ├── apps/
 │   ├── master/          # Fastify API + BullMQ producer + Drizzle DB
 │   ├── worker/          # BullMQ consumer + GPM + Puppeteer
+│   ├── dashboard/       # React dashboard UI (Vite + Tailwind)
 │   └── cli/             # CLI scripts (sync, create-order, list-orders)
 ├── packages/
 │   ├── shared/          # Env, logger, types

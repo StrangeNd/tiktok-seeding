@@ -4,10 +4,22 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./env": "./src/env.ts",
-    "./logger": "./src/logger.ts",
-    "./types": "./src/types.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./env": {
+      "types": "./src/env.ts",
+      "default": "./dist/env.js"
+    },
+    "./logger": {
+      "types": "./src/logger.ts",
+      "default": "./dist/logger.js"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "default": "./dist/types.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

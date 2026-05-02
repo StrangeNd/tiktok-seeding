@@ -3,9 +3,8 @@ module.exports = {
     {
       name: 'tiktok-seeding-master',
       cwd: __dirname,
-      script: 'pnpm',
-      args: '--filter @app/master run start',
-      interpreter: 'none',
+      script: 'apps/master/dist/index.js',
+      interpreter: 'node',
       autorestart: true,
       max_restarts: 10,
       min_uptime: '10s',
@@ -18,9 +17,8 @@ module.exports = {
     {
       name: 'tiktok-seeding-worker',
       cwd: __dirname,
-      script: 'pnpm',
-      args: '--filter @app/worker run start',
-      interpreter: 'none',
+      script: 'apps/worker/dist/index.js',
+      interpreter: 'node',
       autorestart: true,
       max_restarts: 10,
       min_uptime: '10s',

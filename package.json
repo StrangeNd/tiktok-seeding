@@ -7,7 +7,39 @@
   "scripts": {
     "build": "pnpm -r --if-present run build",
     "build:dashboard": "pnpm --filter @app/dashboard run build",
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
+<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
     "build:server": "pnpm --filter @app/master run build && pnpm --filter @app/worker run build",
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
+=======
+    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
+>>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
     "typecheck": "pnpm -r --if-present run typecheck",
     "format": "biome format --write .",
     "lint": "biome lint .",
@@ -25,6 +57,9 @@
     "clean:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/clean-runtime.ps1",
     "doctor": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/doctor.ps1",
     "start:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
+    "start:all:dist": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
+    "start:all:prod": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1",
+    "start:all:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/start.ps1 -Dev",
     "stop:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/stop.ps1",
     "restart:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/restart.ps1",
     "status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/status.ps1",

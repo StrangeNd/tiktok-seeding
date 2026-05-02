@@ -5,13 +5,13 @@ The dashboard is a local operator console for the master API. It helps manage pr
 ## Start
 
 ```powershell
-pnpm build:dashboard
+pnpm build
 pnpm start:all
 ```
 
 Open <http://127.0.0.1:7000/dashboard/> and sign in with `MASTER_API_KEY` from your local `.env`.
 
-For development only, `pnpm dashboard` still starts the Vite dev server on `DASHBOARD_PORT` (default `5173`).
+For development only, `pnpm start:all:dev` runs source services and `pnpm dashboard` starts the Vite dev server on `DASHBOARD_PORT` (default `5173`).
 
 ## Pages
 

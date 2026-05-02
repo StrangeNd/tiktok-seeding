@@ -38,6 +38,7 @@ All commands run from the worktree root.
 |------------------------|------------------------------------------------------------------------------|
 | `pnpm doctor`          | Pre-flight: Node, pnpm, .env, Postgres, Redis, GPM, port :7000               |
 | `pnpm start:all`       | Runs `doctor`, then starts master + worker as detached processes             |
+| `pnpm dashboard`       | Starts the local operator dashboard on `DASHBOARD_PORT` (default :5173)      |
 | `pnpm status`          | Process state, port, /health/deep, heartbeat, profile pool, recent log tails |
 | `pnpm stop:all`        | Graceful taskkill /T of master + worker + orphan node.exe in this worktree   |
 | `pnpm restart:all`     | `stop:all` then `start:all`                                                  |
@@ -81,6 +82,7 @@ Get-Content .runtime\worker.log -Wait
 ```powershell
 pnpm doctor                                    # everything green
 pnpm start:all                                 # master + worker up
+pnpm dashboard                                 # dashboard on http://127.0.0.1:5173
 
 pnpm --filter @app/cli run sync-profiles
 pnpm --filter @app/cli run create-order -- --url=https://www.tiktok.com/@tiktok/live --count=2 --watch=20 --spread=3
@@ -91,6 +93,9 @@ pnpm status                                    # verify everything still healthy
 
 pnpm stop:all                                  # clean shutdown
 ```
+
+Dashboard login uses `MASTER_API_KEY` from local `.env`. See `docs/DASHBOARD.md`
+for account/proxy import, mailbox OAuth2 code retrieval, and security notes.
 
 ---
 
@@ -154,6 +159,11 @@ This was the single biggest pain point before this hardening. Mitigations:
 | `ProfileInUse` errors                                | A previous tab didn't close. `pnpm reset:profiles` then retry.                |
 | Worker logs show heartbeat failing                   | Master is down or `MASTER_API_KEY` mismatch between `.env` and master.        |
 | `pnpm status` shows worker PID file but no live node | Worker crashed; `pnpm start:all -- -OnlyWorker` to relaunch it.               |
+| Dashboard login fails                                | Verify master is up, `MASTER_API_KEY` is correct, and browser points at :7000. |
+| Mail code returns `provider_unsupported`             | Set `MAIL_PROVIDER=microsoft` for Microsoft Graph or keep `custom` disabled.  |
+| Mail code returns `missing_oauth`                    | Account row lacks email, mailbox refresh token, or mailbox client id.         |
+| Mail code returns `token_failed`                     | Refresh token/client id/scope is invalid or revoked. Re-authorize mailbox.    |
+| Mail code returns `code_not_found`                   | No 4-8 digit code in recent messages; adjust lookback/sender/subject filters. |
 
 ---
 
@@ -171,6 +181,8 @@ scripts/windows/
 
 apps/master/src/services/recovery.ts   # the SQL that releases stuck profiles
 apps/worker/src/job-runner.ts          # hard timeout + connect timeout
+docs/DASHBOARD.md                      # operator UI + import/mailbox guide
+.secrets/README.md                     # local-only sensitive input rules
 ```
 
 ---
@@ -184,3 +196,6 @@ apps/worker/src/job-runner.ts          # hard timeout + connect timeout
   track of — handle manually inside the GPM UI for now.
 - Cross-worktree process discovery — `pnpm stop:all` is intentionally scoped
   to this worktree only, so other Cascade sessions are never disturbed.
+- TikTok login / re-auth end-to-end. The dashboard can retrieve a mailbox code
+  for an owned account after a manual click, but it never submits that code or
+  automates platform login/bypass flows.

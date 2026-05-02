@@ -1,8 +1,60 @@
 # SCHEMA — Database design
 
-ORM: **Drizzle**. DB: **SQLite (dev)** → **PostgreSQL 15+ (prod)**.
+ORM: **Drizzle**. DB: **PostgreSQL 14+**.
 
-Toàn bộ schema dùng `bigserial` ID, timestamp `timestamptz`, soft-delete bằng `deleted_at`.
+Phase 1 MVP uses a compact schema: profiles, orders, jobs, workers, accounts,
+and proxies. Sensitive account/proxy material is stored in encrypted blobs.
+
+> Note: the older long-form tables below remain the Phase 2+ target model. The
+> current implemented additions for dashboard/account/proxy/mail-code are listed
+> first.
+
+---
+
+## Current dashboard tables
+
+### `accounts`
+
+| Column | Type | Note |
+|---|---|---|
+| `id` | serial PK | Local account id. |
+| `username` | text | TikTok username/login identifier. |
+| `email` | text | Mailbox address attached to the account. |
+| `status` | text | `active | disabled | broken | quarantined | archived`. |
+| `secret_blob` | text | AES-256-GCM encrypted JSON (`pass`, `passmail`, `refreshtokenmail`, `clientid`, `cookie`). |
+| `has_password` | int flag | Presence flag only. |
+| `has_email_password` | int flag | Legacy mailbox password presence; not used if OAuth refresh token exists. |
+| `has_mail_refresh_token` | int flag | Mailbox OAuth2 refresh token presence. |
+| `has_mail_client_id` | int flag | Mailbox OAuth2 client id presence. |
+| `has_cookie` | int flag | TikTok cookie/session material presence. |
+| `cookie_status` | text | `unknown | present | missing | needs_reauth | dead`. |
+| `last_mail_code_status` | text | `ok | missing_oauth | token_failed | code_not_found | provider_unsupported | rate_limited | error`. |
+| `last_mail_code_error` | text | Sanitized/actionable error only; no secrets. |
+| `last_mail_code_checked_at` | timestamptz | Last manual mailbox-code request. |
+| `last_error`, `last_checked_at` | text/timestamptz | General account health bookkeeping. |
+| `created_at`, `updated_at` | timestamptz | Row timestamps. |
+
+Security invariant: API responses never include `secret_blob` or decrypted
+values. Dashboard displays only masked email and presence flags. Mail-code
+retrieval decrypts OAuth2 fields in memory only after a manual operator click.
+
+### `proxies`
+
+| Column | Type | Note |
+|---|---|---|
+| `id` | serial PK | Local proxy id. |
+| `protocol` | text | `http | https | socks5 | socks4`. |
+| `host`, `port` | text/int | Proxy endpoint. |
+| `username` | text | Optional username. |
+| `secret_blob` | text | AES-256-GCM encrypted proxy password JSON. |
+| `has_auth` | int flag | Proxy auth presence. |
+| `status` | text | `unknown | ok | failed | disabled`. |
+| `latency_ms` | int | Last neutral TCP probe latency. |
+| `last_error`, `last_checked_at` | text/timestamptz | Sanitized probe result. |
+| `created_at`, `updated_at` | timestamptz | Row timestamps. |
+
+Proxy connectivity checks are neutral reachability probes and are not
+platform-specific.
 
 ---
 

@@ -1,11 +1,15 @@
 import { createLogger, loadEnv } from '@app/shared';
+import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
 import { closeDb } from './db/client.js';
 import { closeQueues } from './queue.js';
+import { accountRoutes } from './routes/accounts.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
 import { orderRoutes } from './routes/orders.js';
+import { profileRoutes } from './routes/profiles.js';
+import { proxyRoutes } from './routes/proxies.js';
 import { workerRoutes } from './routes/workers.js';
 import { resetStuckProfiles } from './services/recovery.js';
 
@@ -21,20 +25,37 @@ const app = Fastify({
 // Sensible defaults: app.httpErrors helpers, ETag, etc.
 await app.register(sensible);
 
+// CORS — open in dev so the local dashboard (vite :5173) can call us with x-api-key.
+// Tighten in production by listing the dashboard origin explicitly.
+await app.register(cors, {
+  origin: true,
+  credentials: false,
+  allowedHeaders: ['content-type', 'x-api-key'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+});
+
 // Simple API key middleware (Phase 1 single-key)
 app.addHook('onRequest', async (req, reply) => {
   const path = req.url.split('?')[0] ?? '';
   if (path === '/health' || path === '/health/deep') return;
+  // Allow CORS preflight to pass through unauthenticated.
+  if (req.method === 'OPTIONS') return;
   const key = req.headers['x-api-key'];
   if (key !== env.MASTER_API_KEY) {
     return reply.code(401).send({ error: 'unauthorized' });
   }
 });
 
+// Lightweight auth probe used by the dashboard login screen.
+app.get('/auth/check', async () => ({ ok: true }));
+
 await app.register(healthRoutes);
 await app.register(orderRoutes);
 await app.register(workerRoutes);
 await app.register(jobRoutes);
+await app.register(profileRoutes);
+await app.register(accountRoutes);
+await app.register(proxyRoutes);
 
 // Graceful shutdown
 async function shutdown(signal: string) {

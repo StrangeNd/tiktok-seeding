@@ -15,6 +15,13 @@
       "when": 1777569052073,
       "tag": "0001_shocking_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777730872786,
+      "tag": "0002_magenta_manta",
+      "breakpoints": true
     }
   ]
 }

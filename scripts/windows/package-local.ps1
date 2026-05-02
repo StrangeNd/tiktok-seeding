@@ -47,6 +47,7 @@ $requiredItems = @(
   '.env.example',
   'apps\master\package.json',
   'apps\master\dist',
+  'apps\master\drizzle',
   'apps\worker\package.json',
   'apps\worker\dist',
   'apps\dashboard\package.json',

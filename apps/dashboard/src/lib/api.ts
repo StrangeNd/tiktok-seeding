@@ -1,6 +1,6 @@
 // Thin fetch wrapper around the master REST API.
 //
-// Auth: x-api-key header. Key + master URL come from the Zustand auth store.
+// Auth: dashboard uses HttpOnly session cookies. x-api-key remains optional for internal/API-key flows.
 
 import { useAuth } from '../store/auth';
 import { getMasterUrl } from './config';
@@ -36,6 +36,7 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   const res = await fetch(url, {
     method,
     headers,
+    credentials: 'include',
     body:
       body !== undefined
         ? JSON.stringify(body)
@@ -75,6 +76,43 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
 export async function checkAuth(masterUrl: string, apiKey: string): Promise<boolean> {
   const res = await fetch(`${masterUrl.replace(/\/+$/, '')}/auth/check`, {
     headers: { 'x-api-key': apiKey },
+    credentials: 'include',
   });
   return res.status === 200;
+}
+
+export interface CurrentUser {
+  id: number;
+  username: string;
+  displayName: string;
+  role: 'admin' | 'user';
+  status: 'active' | 'pending' | 'disabled';
+  permissions: string[];
+}
+
+export async function loginWithPassword(masterUrl: string, username: string, password: string) {
+  const res = await fetch(`${masterUrl.replace(/\/+$/, '')}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, body);
+  return body as { user: CurrentUser };
+}
+
+export async function registerUser(
+  masterUrl: string,
+  input: { username: string; displayName?: string; password: string },
+) {
+  const res = await fetch(`${masterUrl.replace(/\/+$/, '')}/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(input),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`, body);
+  return body as { user: CurrentUser; firstAdmin: boolean };
 }

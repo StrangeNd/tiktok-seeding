@@ -1,18 +1,18 @@
 import { type FormEvent, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Spinner } from '../components/ui';
-import { loginWithPassword } from '../lib/api';
+import { registerUser } from '../lib/api';
 import { getMasterUrl, setMasterUrl } from '../lib/config';
 import { useAuth } from '../store/auth';
 import { toast } from '../store/toast';
 
-export function Login() {
+export function Register() {
   const isAuth = useAuth((s) => s.isAuthenticated);
-  const setUser = useAuth((s) => s.setUser);
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [masterUrl, setUrl] = useState(getMasterUrl());
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -24,18 +24,17 @@ export function Login() {
     setBusy(true);
     try {
       const url = masterUrl.trim().replace(/\/+$/, '');
-      if (!/^https?:\/\//i.test(url)) {
-        throw new Error('Master URL must start with http:// or https://');
-      }
       setMasterUrl(url);
-      const result = await loginWithPassword(url, username, password);
-      setUser(result.user);
-      toast.success('Signed in');
-      navigate('/', { replace: true });
+      const result = await registerUser(url, { username, displayName, password });
+      toast.success(
+        result.firstAdmin ? 'Admin created' : 'User registered',
+        result.user.status === 'pending' ? 'Waiting for admin approval.' : 'You can sign in now.',
+      );
+      navigate('/login', { replace: true });
     } catch (e) {
-      const m = (e as Error).message || 'Login failed';
+      const m = (e as Error).message || 'Registration failed';
       setErr(m);
-      toast.error('Login failed', m);
+      toast.error('Registration failed', m);
     } finally {
       setBusy(false);
     }
@@ -45,9 +44,9 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-bg p-6">
       <div className="card w-[440px] max-w-full">
         <div className="px-6 py-5 border-b border-border">
-          <div className="text-lg font-semibold text-text">Seeding Operator Console</div>
+          <div className="text-lg font-semibold text-text">Create operator account</div>
           <div className="text-sm text-text-muted mt-0.5">
-            Sign in with your local operator account.
+            Local/private use only. First user becomes admin.
           </div>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
@@ -57,15 +56,11 @@ export function Login() {
             </label>
             <input
               id="master-url"
-              type="text"
               className="input font-mono"
               value={masterUrl}
               onChange={(e) => setUrl(e.target.value)}
-              spellCheck={false}
-              autoComplete="off"
               disabled={busy}
             />
-            <div className="text-xs text-text-subtle mt-1">Local/private operator API address.</div>
           </div>
           <div>
             <label htmlFor="username" className="label">
@@ -77,7 +72,18 @@ export function Login() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              spellCheck={false}
+              disabled={busy}
+            />
+          </div>
+          <div>
+            <label htmlFor="display-name" className="label">
+              Display name
+            </label>
+            <input
+              id="display-name"
+              className="input"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
               disabled={busy}
             />
           </div>
@@ -91,7 +97,7 @@ export function Login() {
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
+              autoComplete="new-password"
               disabled={busy}
             />
           </div>
@@ -102,12 +108,11 @@ export function Login() {
           )}
           <button type="submit" className="btn-primary w-full" disabled={busy}>
             {busy && <Spinner />}
-            {busy ? 'Signing in...' : 'Sign in'}
+            {busy ? 'Creating...' : 'Register'}
           </button>
           <div className="text-xs text-text-subtle text-center pt-2">
-            Local/private use only. First registered user becomes admin.{' '}
-            <Link className="text-accent hover:underline" to="/register">
-              Register
+            <Link className="text-accent hover:underline" to="/login">
+              Back to sign in
             </Link>
           </div>
         </form>

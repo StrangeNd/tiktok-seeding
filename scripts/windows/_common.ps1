@@ -62,7 +62,11 @@ function Get-EnvMap {
     'MAIL_CODE_MAX_RESULTS',
     'MAIL_CODE_ALLOWED_SENDERS',
     'MAIL_CODE_SUBJECT_HINTS',
-    'MAIL_CODE_REQUEST_COOLDOWN_SECONDS'
+    'MAIL_CODE_REQUEST_COOLDOWN_SECONDS',
+    'AUTH_SESSION_SECRET',
+    'AUTH_ALLOW_SELF_REGISTER',
+    'AUTH_REQUIRE_ADMIN_APPROVAL',
+    'USER_CAN_IMPORT_PROXIES'
   )) {
     $processValue = [Environment]::GetEnvironmentVariable($k, 'Process')
     if ($null -ne $processValue -and $processValue -ne '') {

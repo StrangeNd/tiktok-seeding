@@ -3,9 +3,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { jobs, orders } from '../db/schema.js';
+import { writeAuditLog } from '../services/audit.js';
 import { createOrderAndDispatch } from '../services/order-splitter.js';
 import { syncProfilesFromGpm } from '../services/profile-sync.js';
 import { resetStuckProfiles } from '../services/recovery.js';
+import { requirePermission } from './auth.js';
 
 const createOrderSchema = z.object({
   type: z.literal('live_view'), // Phase 1
@@ -18,12 +20,25 @@ const createOrderSchema = z.object({
 export async function orderRoutes(app: FastifyInstance): Promise<void> {
   // POST /orders — tạo order + dispatch
   app.post('/orders', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'orders:create');
+    if (!user) return;
     const parsed = createOrderSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     }
     try {
       const result = await createOrderAndDispatch(parsed.data);
+      await writeAuditLog({
+        actor: user,
+        action: 'order.created',
+        entityType: 'order',
+        entityId: result.orderId,
+        metadata: {
+          type: parsed.data.type,
+          count: parsed.data.count,
+          watchSeconds: parsed.data.watchSeconds,
+        },
+      });
       return reply.code(201).send(result);
     } catch (e) {
       app.log.error({ err: e }, 'createOrder failed');
@@ -64,7 +79,9 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /admin/sync-profiles — pull profile từ GPM
-  app.post('/admin/sync-profiles', async (_req, reply) => {
+  app.post('/admin/sync-profiles', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'admin:recovery');
+    if (!user) return;
     try {
       const result = await syncProfilesFromGpm();
       return result;
@@ -75,9 +92,17 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
 
   // POST /admin/reset-stuck-profiles — release in_use profiles whose jobs are all terminal.
   // Idempotent. Safe to run while workers are active (only touches stranded rows).
-  app.post('/admin/reset-stuck-profiles', async (_req, reply) => {
+  app.post('/admin/reset-stuck-profiles', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'admin:recovery');
+    if (!user) return;
     try {
       const result = await resetStuckProfiles();
+      await writeAuditLog({
+        actor: user,
+        action: 'recovery.reset_stuck_profiles',
+        entityType: 'profile',
+        metadata: { released: result.released },
+      });
       return result;
     } catch (e) {
       return reply.code(500).send({ error: 'reset_failed', message: (e as Error).message });

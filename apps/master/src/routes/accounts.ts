@@ -9,7 +9,9 @@ import {
   setAccountStatus,
   updateAccountState,
 } from '../services/accounts.js';
+import { writeAuditLog } from '../services/audit.js';
 import { MailCodeError, getLatestCodeForAccount } from '../services/mail-code.js';
+import { requirePermission } from './auth.js';
 
 const previewSchema = z.object({
   text: z.string().max(2_000_000),
@@ -44,19 +46,37 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/accounts/import/preview', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'accounts:import');
+    if (!user) return;
     const parsed = previewSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     }
-    return buildAccountImportPreview(parsed.data.text);
+    const result = await buildAccountImportPreview(parsed.data.text);
+    await writeAuditLog({
+      actor: user,
+      action: 'account.import.preview',
+      entityType: 'account',
+      metadata: { total: result.total, valid: result.valid, invalid: result.invalid },
+    });
+    return result;
   });
 
   app.post('/accounts/import', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'accounts:import');
+    if (!user) return;
     const parsed = importSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     }
-    return importAccountsFromText(parsed.data.text);
+    const result = await importAccountsFromText(parsed.data.text);
+    await writeAuditLog({
+      actor: user,
+      action: 'account.import.saved',
+      entityType: 'account',
+      metadata: { inserted: result.inserted, skipped: result.skipped, total: result.total },
+    });
+    return result;
   });
 
   app.patch('/accounts/:id/status', async (req, reply) => {
@@ -99,12 +119,22 @@ export async function accountRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/accounts/:id/mail-code', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'accounts:view_masked');
+    if (!user) return;
     const id = Number((req.params as { id: string }).id);
     if (!Number.isFinite(id)) return reply.code(400).send({ error: 'invalid_id' });
     const exists = await getAccount(id);
     if (!exists) return reply.code(404).send({ error: 'not_found' });
     try {
-      return await getLatestCodeForAccount(id);
+      const result = await getLatestCodeForAccount(id);
+      await writeAuditLog({
+        actor: user,
+        action: 'mail_code.requested',
+        entityType: 'account',
+        entityId: id,
+        metadata: { provider: result.provider, receivedAt: result.receivedAt },
+      });
+      return result;
     } catch (e) {
       if (e instanceof MailCodeError) {
         const status =

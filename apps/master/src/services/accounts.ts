@@ -1,8 +1,9 @@
 import { createLogger } from '@app/shared';
 import { sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { type Account, accounts } from '../db/schema.js';
+import { type Account, accountProxyAssignments, accounts, proxies } from '../db/schema.js';
 import { decryptJson, encryptJson, maskSecret } from '../lib/crypto.js';
+import { rebalanceProxyAssignments } from './proxy-assignment.js';
 
 const log = createLogger('accounts');
 
@@ -290,6 +291,7 @@ export async function importAccountsFromText(text: string): Promise<ImportResult
   }
 
   await db.insert(accounts).values(toInsert);
+  await rebalanceProxyAssignments();
   log.info({ inserted: toInsert.length }, 'Accounts imported');
   return {
     inserted: toInsert.length,
@@ -317,6 +319,7 @@ export interface SafeAccount {
   lastCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  assignedProxy: { id: number; label: string; status: string } | null;
 }
 
 export function toSafeAccount(a: Account): SafeAccount {
@@ -339,7 +342,12 @@ export function toSafeAccount(a: Account): SafeAccount {
     lastCheckedAt: a.lastCheckedAt ? a.lastCheckedAt.toISOString() : null,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
+    assignedProxy: null,
   };
+}
+
+function safeProxyLabel(p: { protocol: string; host: string; port: number }): string {
+  return `${p.protocol}://${p.host}:${p.port}`;
 }
 
 export async function listAccounts(
@@ -353,8 +361,10 @@ export async function listAccounts(
   const offset = opts.offset ?? 0;
   const where = opts.status ? eq(accounts.status, opts.status) : undefined;
   const rows = await db
-    .select()
+    .select({ account: accounts, proxy: proxies })
     .from(accounts)
+    .leftJoin(accountProxyAssignments, eq(accountProxyAssignments.accountId, accounts.id))
+    .leftJoin(proxies, eq(accountProxyAssignments.proxyId, proxies.id))
     .where(where)
     .orderBy(drizzleSql`${accounts.id} desc`)
     .limit(limit)
@@ -364,12 +374,33 @@ export async function listAccounts(
     .from(accounts)
     .where(where);
   const count = countRow?.count ?? 0;
-  return { items: rows.map(toSafeAccount), total: count };
+  return {
+    items: rows.map((row) => ({
+      ...toSafeAccount(row.account),
+      assignedProxy: row.proxy
+        ? { id: row.proxy.id, label: safeProxyLabel(row.proxy), status: row.proxy.status }
+        : null,
+    })),
+    total: count,
+  };
 }
 
 export async function getAccount(id: number): Promise<SafeAccount | null> {
-  const [row] = await db.select().from(accounts).where(eq(accounts.id, id)).limit(1);
-  return row ? toSafeAccount(row) : null;
+  const [row] = await db
+    .select({ account: accounts, proxy: proxies })
+    .from(accounts)
+    .leftJoin(accountProxyAssignments, eq(accountProxyAssignments.accountId, accounts.id))
+    .leftJoin(proxies, eq(accountProxyAssignments.proxyId, proxies.id))
+    .where(eq(accounts.id, id))
+    .limit(1);
+  return row
+    ? {
+        ...toSafeAccount(row.account),
+        assignedProxy: row.proxy
+          ? { id: row.proxy.id, label: safeProxyLabel(row.proxy), status: row.proxy.status }
+          : null,
+      }
+    : null;
 }
 
 export async function getAccountsSummary(): Promise<{

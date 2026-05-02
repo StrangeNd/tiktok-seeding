@@ -8,7 +8,7 @@ This runbook is for a non-developer Windows operator running the local operator 
 - Built React dashboard served by the master at `/dashboard/`.
 - BullMQ worker connected to Redis/Memurai, run from compiled `apps/worker/dist/index.js` in operator mode.
 - PostgreSQL storage for profiles, orders, jobs, accounts, proxies, and encrypted secret blobs.
-- Windows PowerShell scripts for setup, start, stop, restart, status, logs, backup, restore, update, and release checks.
+- Windows PowerShell scripts for setup, start, stop, restart, status, logs, backup, restore, update, shortcut creation, PM2 helpers, and release checks.
 - Optional PM2 process manager configuration for auto-restart.
 
 ## First-time setup
@@ -31,6 +31,7 @@ Before production-like use, edit `.env` and replace default values for:
 
 - `MASTER_API_KEY`
 - `CREDENTIALS_ENCRYPTION_KEY`
+- `AUTH_SESSION_SECRET`
 - `DATABASE_URL` if not using local Postgres
 - `REDIS_URL` if not using local Redis/Memurai
 - `GPM_ENDPOINT` and `GPM_API_PREFIX` for real GPM Login
@@ -101,7 +102,9 @@ http://127.0.0.1:7000/dashboard/
 
 If `MASTER_PORT` differs in `.env`, replace `7000` with that port.
 
-Log in using `MASTER_API_KEY` from your local `.env`. The dashboard stores the API key only in your browser local storage. Raw account, mailbox, cookie, and proxy secrets are never returned to the dashboard.
+Create the first dashboard user from **Register**. The first registered user becomes `admin`. Later self-registered users become `user` accounts and may require admin approval if `AUTH_REQUIRE_ADMIN_APPROVAL=true`.
+
+Dashboard sessions use HttpOnly cookies. Raw account, mailbox, cookie, auth, and proxy secrets are never returned to the dashboard.
 
 ## Managing operator data
 
@@ -114,9 +117,26 @@ Use dashboard pages:
 - **Orders** to create and inspect orders.
 - **Activity** to inspect jobs.
 - **Admin** for health and safe recovery actions.
+- **Users** for admin-only user management.
+- **Audit** for safe operational audit logs.
 - **Settings** for local browser dashboard settings.
 
 Mailbox code retrieval is operator-assisted only. It reads an owned mailbox through OAuth2, returns the code to the operator, and does not automate TikTok login or submit codes.
+
+## Roles and permissions
+
+- **Admin**: full local operator access, including user management, audit logs, account/proxy import, order creation, and recovery actions.
+- **User**: login, dashboard/status/log viewing, order creation, account import, and masked account/proxy viewing.
+
+Users cannot manage users or run recovery actions. Users can import proxies only when `USER_CAN_IMPORT_PROXIES=true`.
+
+Passwords are stored as `scrypt` hashes. This local role system is suitable for private/operator use, not a complete internet-facing identity platform.
+
+## Proxy assignment
+
+Account/proxy assignment is deterministic round-robin. Rebalance orders accounts by account id and proxies by proxy id, then assigns accounts across available proxies.
+
+The dashboard shows proxy assignment counts and assigned proxy labels only. Proxy passwords and account secrets remain encrypted and are not returned by the API.
 
 ## Backup
 
@@ -193,7 +213,7 @@ The release appears at:
 .releases\tiktok-seeding-YYYYMMDD-HHMMSS\
 ```
 
-It includes compiled runtime artifacts, dashboard dist, Windows operator scripts, PM2 configs, selected docs, `.env.example`, `.secrets/README.md`, and `.secrets/*.example.txt`.
+It includes compiled runtime artifacts, dashboard dist, Windows operator scripts, PM2 configs, database migrations under `apps/master/drizzle`, selected docs, `.env.example`, `.secrets/README.md`, and `.secrets/*.example.txt`.
 
 It intentionally excludes `.git/`, `node_modules/`, source folders where compiled output is enough, `.env`, real `.secrets/*`, `.runtime/`, `.backups/`, `.local-backup/`, coverage, logs, and raw account/proxy data.
 
@@ -205,15 +225,21 @@ If the operator chooses PM2:
 
 ```powershell
 npm install -g pm2
-pnpm build:dashboard
-pnpm build:server
-pm2 start ecosystem.config.cjs
-pm2 status
-pm2 logs
-pm2 save
+pnpm pm2:start
+pnpm pm2:status
+pnpm pm2:logs
+pnpm pm2:stop
 ```
 
 Only run `pm2 startup` if the operator intentionally wants PM2 to register startup services on that machine.
+
+Create daily-use desktop shortcuts:
+
+```powershell
+pnpm shortcuts:create
+```
+
+The shortcuts call local package scripts and the dashboard URL. They do not embed `.env` values, API keys, auth secrets, account data, proxy credentials, cookies, refresh tokens, or passwords.
 
 Stop/remove services:
 

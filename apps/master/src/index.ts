@@ -5,13 +5,15 @@ import Fastify from 'fastify';
 import { closeDb } from './db/client.js';
 import { closeQueues } from './queue.js';
 import { accountRoutes } from './routes/accounts.js';
+import { auditRoutes } from './routes/audit.js';
+import { authRoutes, getRequestUser } from './routes/auth.js';
+import { dashboardRoutes, isDashboardAssetRequest } from './routes/dashboard.js';
 import { healthRoutes } from './routes/health.js';
 import { jobRoutes } from './routes/jobs.js';
 import { orderRoutes } from './routes/orders.js';
 import { profileRoutes } from './routes/profiles.js';
 import { proxyRoutes } from './routes/proxies.js';
 import { workerRoutes } from './routes/workers.js';
-import { dashboardRoutes, isDashboardAssetRequest } from './routes/dashboard.js';
 import { resetStuckProfiles } from './services/recovery.js';
 
 const env = loadEnv();
@@ -33,27 +35,36 @@ await app.register(sensible);
 // Tighten in production by listing the dashboard origin explicitly.
 await app.register(cors, {
   origin: true,
-  credentials: false,
+  credentials: true,
   allowedHeaders: ['content-type', 'x-api-key'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
 });
 
-// Simple API key middleware (Phase 1 single-key)
 app.addHook('onRequest', async (req, reply) => {
   const path = req.url.split('?')[0] ?? '';
   if (path === '/health' || path === '/health/deep') return;
   if (isDashboardAssetRequest(req.method, path)) return;
+  if (
+    path === '/auth/register' ||
+    path === '/auth/login' ||
+    path === '/auth/logout' ||
+    path === '/auth/me'
+  ) {
+    return;
+  }
   // Allow CORS preflight to pass through unauthenticated.
   if (req.method === 'OPTIONS') return;
   const key = req.headers['x-api-key'];
-  if (key !== env.MASTER_API_KEY) {
+  if (key === env.MASTER_API_KEY) return;
+  const user = await getRequestUser(req);
+  if (!user || user.status !== 'active') {
     return reply.code(401).send({ error: 'unauthorized' });
   }
 });
 
-// Lightweight auth probe used by the dashboard login screen.
-app.get('/auth/check', async () => ({ ok: true }));
+app.get('/auth/check', async (req) => ({ ok: true, user: await getRequestUser(req) }));
 
+await app.register(authRoutes);
 await app.register(healthRoutes);
 await app.register(orderRoutes);
 await app.register(workerRoutes);
@@ -61,6 +72,7 @@ await app.register(jobRoutes);
 await app.register(profileRoutes);
 await app.register(accountRoutes);
 await app.register(proxyRoutes);
+await app.register(auditRoutes);
 await app.register(dashboardRoutes);
 
 // Graceful shutdown

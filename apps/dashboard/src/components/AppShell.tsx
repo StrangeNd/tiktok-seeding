@@ -20,11 +20,14 @@ const NAV: NavItem[] = [
   { to: '/orders', label: 'Orders', icon: '➜' },
   { to: '/jobs', label: 'Activity', icon: '◈' },
   { to: '/admin', label: 'Admin', icon: '⚒' },
+  { to: '/users', label: 'Users', icon: '◎' },
+  { to: '/audit-logs', label: 'Audit', icon: '◷' },
   { to: '/settings', label: 'Settings', icon: '✎' },
 ];
 
 export function AppShell() {
   const logout = useAuth((s) => s.logout);
+  const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const [healthy, setHealthy] = useState<null | boolean>(null);
 
@@ -57,7 +60,7 @@ export function AppShell() {
           <div className="text-xs text-text-subtle mt-0.5">Console v0.1</div>
         </div>
         <nav className="flex-1 px-2 py-3 space-y-0.5">
-          {NAV.map((n) => (
+          {NAV.filter((n) => (n.to === '/users' ? user?.role === 'admin' : true)).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -101,10 +104,16 @@ export function AppShell() {
         <header className="h-14 border-b border-border bg-bg-subtle flex items-center justify-between px-6 shrink-0">
           <div className="text-sm text-text-muted">TikTok seeding orchestrator</div>
           <div className="flex items-center gap-2">
+            {user && (
+              <div className="text-xs text-text-muted">
+                {user.displayName} <span className="badge-info">{user.role}</span>
+              </div>
+            )}
             <button
               type="button"
               className="btn-ghost text-xs"
               onClick={() => {
+                void api('/auth/logout', { method: 'POST', throwOnError: false });
                 logout();
                 toast.info('Logged out');
                 navigate('/login');

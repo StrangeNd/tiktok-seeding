@@ -2,7 +2,16 @@
 // Phase 2+ sẽ bổ sung: accounts (login state, cookie), proxies, action_logs chi tiết.
 
 import { sql } from 'drizzle-orm';
-import { index, integer, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 /**
  * `profiles` — mirror các GPM profile có trong app GPM Login.
@@ -161,6 +170,84 @@ export const proxies = pgTable(
   }),
 );
 
+export const users = pgTable(
+  'users',
+  {
+    id: serial('id').primaryKey(),
+    username: text('username').notNull(),
+    displayName: text('display_name').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    role: text('role').notNull().default('user'),
+    status: text('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (t) => ({
+    usernameUniqueIdx: uniqueIndex('users_username_unique_idx').on(t.username),
+    roleIdx: index('users_role_idx').on(t.role),
+    statusIdx: index('users_status_idx').on(t.status),
+  }),
+);
+
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (t) => ({
+    tokenHashUniqueIdx: uniqueIndex('sessions_token_hash_unique_idx').on(t.tokenHash),
+    userIdx: index('sessions_user_idx').on(t.userId),
+    expiresIdx: index('sessions_expires_idx').on(t.expiresAt),
+  }),
+);
+
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: serial('id').primaryKey(),
+    actorUserId: integer('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorUsername: text('actor_username'),
+    action: text('action').notNull(),
+    entityType: text('entity_type').notNull(),
+    entityId: text('entity_id'),
+    metadataJson: text('metadata_json'),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    actionIdx: index('audit_logs_action_idx').on(t.action),
+    actorIdx: index('audit_logs_actor_idx').on(t.actorUserId),
+    createdIdx: index('audit_logs_created_idx').on(t.createdAt),
+  }),
+);
+
+export const accountProxyAssignments = pgTable(
+  'account_proxy_assignments',
+  {
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    proxyId: integer('proxy_id')
+      .notNull()
+      .references(() => proxies.id, { onDelete: 'cascade' }),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+    strategy: text('strategy').notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.accountId] }),
+    proxyIdx: index('account_proxy_assignments_proxy_idx').on(t.proxyId),
+  }),
+);
+
 // Helper types ─ Drizzle infer từ schema
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
@@ -173,3 +260,8 @@ export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type Proxy = typeof proxies.$inferSelect;
 export type NewProxy = typeof proxies.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type AccountProxyAssignment = typeof accountProxyAssignments.$inferSelect;

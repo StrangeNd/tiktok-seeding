@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { jobs, orders, profiles } from '../db/schema.js';
 
+// (route-level) recent jobs list for dashboard activity view
+
 const startSchema = z.object({
   jobId: z.number().int().positive(),
   workerName: z.string().min(1),
@@ -120,5 +122,26 @@ export async function jobRoutes(app: FastifyInstance): Promise<void> {
     });
 
     return { ok: true, status };
+  });
+
+  // GET /jobs — list recent jobs (newest first) for activity view
+  app.get('/jobs', async (req) => {
+    const q = req.query as { status?: string; limit?: string; offset?: string };
+    const limit = Math.min(q.limit ? Number(q.limit) : 50, 200);
+    const offset = q.offset ? Number(q.offset) : 0;
+    const where = q.status ? eq(jobs.status, q.status) : undefined;
+    const rows = await db
+      .select()
+      .from(jobs)
+      .where(where)
+      .orderBy(drizzleSql`${jobs.id} desc`)
+      .limit(limit)
+      .offset(offset);
+    const [countRow] = await db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(jobs)
+      .where(where);
+    const count = countRow?.count ?? 0;
+    return { items: rows, total: count };
   });
 }

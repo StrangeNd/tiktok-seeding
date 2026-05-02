@@ -17,6 +17,13 @@ pids/
 # Local Windows operator runtime (PID files, rotating logs from scripts/windows/*)
 .runtime/
 
+# Operator-only sensitive material (account/proxy lists, exported dumps).
+# Examples (.example.txt) under .secrets/ are tracked deliberately.
+.secrets/*
+!.secrets/.gitkeep
+!.secrets/*.example.txt
+!.secrets/README.md
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,9 @@
+# Fake sample data — DO NOT use real credentials in this committed file.
+# Format: username|pass|mail|passmail|refreshtokenmail|clientid|cookie
+# Empty fields are allowed.
+
+sample_user_001|FakePass#1|sample001@example.com|FakeMailPass1|fake-refresh-token-aaaa|fake-client-id-1111|fake-cookie-blob-zzzz
+sample_user_002|FakePass#2|sample002@example.com||||
+sample_user_003||sample003@example.com||fake-refresh-token-bbbb||
+# duplicate username on next line is intentional to demo dedupe
+sample_user_001|FakePass#1|sample001@example.com|||||

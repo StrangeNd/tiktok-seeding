@@ -1,0 +1,15 @@
+# Fake sample data — DO NOT paste real proxy credentials here.
+# Supported formats:
+#   host:port
+#   host:port:username:password
+#   protocol://host:port
+#   protocol://username:password@host:port
+
+192.0.2.10:8080
+198.51.100.20:3128:fakeuser1:FakePass#1
+http://203.0.113.30:8000
+http://fakeuser2:FakePass#2@192.0.2.40:8080
+socks5://198.51.100.50:1080
+socks5://fakeuser3:FakePass#3@203.0.113.60:1080
+# duplicate (host:port) on next line is intentional to demo dedupe
+192.0.2.10:8080

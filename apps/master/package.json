@@ -16,6 +16,7 @@
   "dependencies": {
     "@app/gpm-client": "workspace:*",
     "@app/shared": "workspace:*",
+    "@fastify/cors": "^10.0.1",
     "@fastify/sensible": "^6.0.1",
     "bullmq": "^5.21.2",
     "drizzle-orm": "^0.36.1",

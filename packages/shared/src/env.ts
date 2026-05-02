@@ -49,6 +49,30 @@ const envSchema = z.object({
   // ─── Worker ───
   WORKER_NAME: z.string().default('worker-local'),
   CONCURRENCY: z.coerce.number().int().min(1).max(200).default(10),
+
+  // ─── Dashboard ───
+  DASHBOARD_PORT: z.coerce.number().int().min(1).max(65535).default(5173),
+
+  // ─── Secrets / sensitive storage ───
+  // Used to AES-256-GCM encrypt account/proxy secret blobs at rest.
+  // MUST be >= 32 chars in production. Default is dev-only and unsafe.
+  CREDENTIALS_ENCRYPTION_KEY: z
+    .string()
+    .min(16)
+    .default('dev-credentials-key-change-me-please-32+ch'),
+
+  // Neutral connectivity-test endpoint for proxy validation. Default is a
+  // platform-agnostic public IP echo (no TikTok). Operators can override.
+  PROXY_TEST_URL: z.string().url().default('https://api.ipify.org?format=text'),
+  PROXY_TEST_TIMEOUT_MS: z.coerce.number().int().min(500).max(60000).default(8000),
+
+  // ─── Mail code retrieval (owned-account inboxes only) ───
+  MAIL_PROVIDER: z.enum(['microsoft', 'gmail', 'custom']).default('custom'),
+  MAIL_CODE_LOOKBACK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+  MAIL_CODE_MAX_RESULTS: z.coerce.number().int().min(1).max(50).default(10),
+  MAIL_CODE_ALLOWED_SENDERS: z.string().optional(),
+  MAIL_CODE_SUBJECT_HINTS: z.string().optional(),
+  MAIL_CODE_REQUEST_COOLDOWN_SECONDS: z.coerce.number().int().min(0).max(300).default(30),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -63,9 +87,7 @@ export function loadEnv(): AppEnv {
   if (cached) return cached;
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    // biome-ignore lint/suspicious/noConsole: bootstrap, logger chưa sẵn sàng
     console.error('✗ Invalid environment variables:');
-    // biome-ignore lint/suspicious/noConsole: bootstrap
     console.error(JSON.stringify(parsed.error.flatten().fieldErrors, null, 2));
     process.exit(1);
   }

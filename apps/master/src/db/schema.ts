@@ -91,6 +91,76 @@ export const workers = pgTable('workers', {
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().default(sql`now()`),
 });
 
+/**
+ * `accounts` — TikTok account pool. Sensitive secret material is stored encrypted
+ * in `secret_blob` (AES-256-GCM ciphertext, base64). The dashboard NEVER reads
+ * plaintext back; only presence flags are exposed.
+ */
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: serial('id').primaryKey(),
+    username: text('username').notNull(),
+    email: text('email'),
+    /** active | disabled | broken | quarantined | archived */
+    status: text('status').notNull().default('active'),
+    /** Encrypted JSON blob: { pass, mail, passmail, refreshtokenmail, clientid, cookie } */
+    secretBlob: text('secret_blob'),
+    /** Quick-glance flags; do NOT replicate raw secret values. */
+    hasPassword: integer('has_password').notNull().default(0),
+    hasEmailPassword: integer('has_email_password').notNull().default(0),
+    hasMailRefreshToken: integer('has_mail_refresh_token').notNull().default(0),
+    hasMailClientId: integer('has_mail_client_id').notNull().default(0),
+    hasCookie: integer('has_cookie').notNull().default(0),
+    /** unknown | present | missing | needs_reauth | dead */
+    cookieStatus: text('cookie_status').notNull().default('unknown'),
+    /** ok | missing_oauth | token_failed | code_not_found | provider_unsupported | error */
+    lastMailCodeStatus: text('last_mail_code_status'),
+    lastMailCodeError: text('last_mail_code_error'),
+    lastMailCodeCheckedAt: timestamp('last_mail_code_checked_at', { withTimezone: true }),
+    lastError: text('last_error'),
+    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    usernameIdx: index('accounts_username_idx').on(t.username),
+    emailIdx: index('accounts_email_idx').on(t.email),
+    statusIdx: index('accounts_status_idx').on(t.status),
+    cookieStatusIdx: index('accounts_cookie_status_idx').on(t.cookieStatus),
+  }),
+);
+
+/**
+ * `proxies` — Proxy pool. Password is stored encrypted in `secret_blob` (AES-256-GCM).
+ * Dashboard receives only `hasAuth` flag and masked username, never the password.
+ */
+export const proxies = pgTable(
+  'proxies',
+  {
+    id: serial('id').primaryKey(),
+    /** http | https | socks5 | socks4 */
+    protocol: text('protocol').notNull().default('http'),
+    host: text('host').notNull(),
+    port: integer('port').notNull(),
+    username: text('username'),
+    /** Encrypted password (AES-256-GCM, base64). */
+    secretBlob: text('secret_blob'),
+    hasAuth: integer('has_auth').notNull().default(0),
+    /** unknown | ok | failed | disabled */
+    status: text('status').notNull().default('unknown'),
+    latencyMs: integer('latency_ms'),
+    lastError: text('last_error'),
+    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    hostPortIdx: index('proxies_host_port_idx').on(t.host, t.port),
+    statusIdx: index('proxies_status_idx').on(t.status),
+  }),
+);
+
 // Helper types ─ Drizzle infer từ schema
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
@@ -99,3 +169,7 @@ export type NewOrder = typeof orders.$inferInsert;
 export type Job = typeof jobs.$inferSelect;
 export type NewJob = typeof jobs.$inferInsert;
 export type Worker = typeof workers.$inferSelect;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Proxy = typeof proxies.$inferSelect;
+export type NewProxy = typeof proxies.$inferInsert;

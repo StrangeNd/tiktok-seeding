@@ -13,6 +13,8 @@ import { Proxies } from './pages/Proxies';
 import { Settings } from './pages/Settings';
 import { useAuth } from './store/auth';
 
+declare const __DASHBOARD_BASE__: string;
+
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const ok = useAuth((s) => s.isAuthenticated);
   return ok ? <>{children}</> : <Navigate to="/login" replace />;
@@ -20,7 +22,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export function App() {
   return (
-    <Router>
+    <Router basename={typeof __DASHBOARD_BASE__ !== 'undefined' ? __DASHBOARD_BASE__ : undefined}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route

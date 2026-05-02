@@ -49,11 +49,16 @@ Check '.env exists' {
 }
 
 Check '.env has required vars' {
-  $required = @('DATABASE_URL','REDIS_URL','GPM_ENDPOINT','MASTER_API_KEY','MASTER_PORT','WORKER_NAME','CONCURRENCY')
+  $required = @('DATABASE_URL','REDIS_URL','GPM_ENDPOINT','GPM_API_PREFIX','MASTER_API_KEY','MASTER_PORT','WORKER_NAME','CONCURRENCY','CREDENTIALS_ENCRYPTION_KEY')
   $missing = @()
   foreach ($k in $required) { if (-not $envMap.ContainsKey($k) -or -not $envMap[$k]) { $missing += $k } }
   if ($missing.Count -gt 0) { throw "missing keys: $($missing -join ', ')" }
   return "$($required.Count) keys present"
+}
+
+$configWarnings = Get-OperatorConfigWarnings
+foreach ($w in $configWarnings) {
+  Write-Warn2 $w
 }
 
 # -- Postgres --------------------------------------------------------
@@ -62,7 +67,7 @@ Check 'PostgreSQL reachable' {
   if (-not $url) { throw 'DATABASE_URL not set' }
   # Parse: postgres://user:pass@host:port/db
   if ($url -notmatch '^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):(\d+)\/(\S+?)(?:\?.*)?$') {
-    throw "DATABASE_URL not parseable: $url"
+    throw 'DATABASE_URL not parseable'
   }
   $pgUser=$matches[1]; $pgPass=$matches[2]; $pgHost=$matches[3]; $pgPort=$matches[4]; $pgDb=$matches[5]
   $tcp = Test-NetConnection -ComputerName $pgHost -Port ([int]$pgPort) -InformationLevel Quiet -WarningAction SilentlyContinue
@@ -74,14 +79,14 @@ Check 'PostgreSQL reachable' {
   return ('{0}:{1}/{2} OK' -f $pgHost,$pgPort,$pgDb)
 }
 
-Check 'Schema migrated (4 tables)' {
+Check 'Schema migrated (dashboard/operator tables)' {
   $url = $envMap['DATABASE_URL']
   if ($url -notmatch '^postgres(?:ql)?:\/\/([^:]+):([^@]+)@([^:\/]+):(\d+)\/(\S+?)(?:\?.*)?$') { throw 'DATABASE_URL unparseable' }
   $pgUser=$matches[1]; $pgPass=$matches[2]; $pgHost=$matches[3]; $pgPort=$matches[4]; $pgDb=$matches[5]
   $env:PGPASSWORD = $pgPass
   $tables = & psql -h $pgHost -p $pgPort -U $pgUser -d $pgDb -tAc "SELECT string_agg(tablename,',') FROM pg_tables WHERE schemaname='public'" 2>$null
   Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
-  $expected = @('jobs','orders','profiles','workers')
+  $expected = @('accounts','jobs','orders','profiles','proxies','workers')
   $actual = ($tables -split ',') | Where-Object { $_ }
   $missing = $expected | Where-Object { $_ -notin $actual }
   if ($missing) { throw ("missing tables: " + ($missing -join ', ') + " - run 'pnpm db:migrate'") }
@@ -124,6 +129,12 @@ Check "Port :$port free or ours" {
   $ourPid = Read-PidFromFile 'master'
   if ($ourPid -and $owner -eq $ourPid) { return "owned by our master (PID $owner)" }
   throw ("occupied by foreign PID " + $owner + ". Run pnpm stop:all or kill it manually.")
+}
+
+Check 'Production dashboard build available' {
+  $index = Join-Path $script:RepoRoot 'apps\dashboard\dist\index.html'
+  if (-not (Test-Path $index)) { throw 'dashboard dist missing; run pnpm build:dashboard' }
+  return $index
 }
 
 # -- Summary ---------------------------------------------------------

@@ -77,6 +77,9 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+const DEFAULT_MASTER_API_KEY = 'dev-key-change-me';
+const DEFAULT_CREDENTIALS_ENCRYPTION_KEY = 'dev-credentials-key-change-me-please-32+ch';
+
 let cached: AppEnv | null = null;
 
 /**
@@ -100,4 +103,26 @@ export function loadEnv(): AppEnv {
  */
 export function _resetEnvCache(): void {
   cached = null;
+}
+
+export function getConfigWarnings(env: AppEnv): string[] {
+  const warnings: string[] = [];
+  if (env.MASTER_API_KEY === DEFAULT_MASTER_API_KEY) {
+    warnings.push('MASTER_API_KEY is using the default development value');
+  }
+  if (
+    env.CREDENTIALS_ENCRYPTION_KEY === DEFAULT_CREDENTIALS_ENCRYPTION_KEY ||
+    env.CREDENTIALS_ENCRYPTION_KEY.length < 32
+  ) {
+    warnings.push('CREDENTIALS_ENCRYPTION_KEY is default or shorter than 32 characters');
+  }
+  if (
+    env.NODE_ENV === 'production' &&
+    (env.MASTER_API_KEY === DEFAULT_MASTER_API_KEY ||
+      env.CREDENTIALS_ENCRYPTION_KEY === DEFAULT_CREDENTIALS_ENCRYPTION_KEY ||
+      env.CREDENTIALS_ENCRYPTION_KEY.length < 32)
+  ) {
+    warnings.push('NODE_ENV=production is running with unsafe operator secrets');
+  }
+  return warnings;
 }

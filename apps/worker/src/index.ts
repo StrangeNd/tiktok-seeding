@@ -1,4 +1,4 @@
-import { type JobPayload, createLogger, loadEnv } from '@app/shared';
+import { type JobPayload, createLogger, getConfigWarnings, loadEnv } from '@app/shared';
 import { type Job as BullJob, Worker as BullWorker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { runLiveViewJob } from './job-runner.js';
@@ -6,6 +6,9 @@ import { reportJobFinish, reportJobStart, sendHeartbeat } from './master-client.
 
 const env = loadEnv();
 const log = createLogger(`worker:${env.WORKER_NAME}`);
+for (const warning of getConfigWarnings(env)) {
+  log.warn({ warning }, 'Unsafe production/operator configuration');
+}
 
 const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
 

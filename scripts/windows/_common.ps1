@@ -16,6 +16,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 $script:RepoRoot   = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $script:RuntimeDir = Join-Path $RepoRoot '.runtime'
+$script:BackupsDir = Join-Path $RepoRoot '.backups'
 $script:EnvPath    = Join-Path $RepoRoot '.env'
 
 if (-not (Test-Path $RuntimeDir)) {
@@ -52,6 +53,23 @@ function Get-EnvValue {
 function Get-MasterPort { [int](Get-EnvValue 'MASTER_PORT' '7000') }
 function Get-MasterApiKey { Get-EnvValue 'MASTER_API_KEY' 'dev-key-change-me' }
 function Get-MasterBaseUrl { "http://127.0.0.1:$(Get-MasterPort)" }
+function Get-BackupRoot { $script:BackupsDir }
+
+function Get-OperatorConfigWarnings {
+  $map = Get-EnvMap
+  $warnings = @()
+  $apiKey = if ($map.ContainsKey('MASTER_API_KEY')) { $map['MASTER_API_KEY'] } else { 'dev-key-change-me' }
+  $secretKey = if ($map.ContainsKey('CREDENTIALS_ENCRYPTION_KEY')) { $map['CREDENTIALS_ENCRYPTION_KEY'] } else { '' }
+  $nodeEnv = if ($map.ContainsKey('NODE_ENV')) { $map['NODE_ENV'] } else { 'development' }
+  if ($apiKey -eq 'dev-key-change-me') { $warnings += 'MASTER_API_KEY is using the default development value' }
+  if (-not $secretKey -or $secretKey -eq 'dev-credentials-key-change-me-please-32+ch' -or $secretKey.Length -lt 32) {
+    $warnings += 'CREDENTIALS_ENCRYPTION_KEY is missing/default/shorter than 32 characters'
+  }
+  if ($nodeEnv -eq 'production' -and $warnings.Count -gt 0) {
+    $warnings += 'NODE_ENV=production is running with unsafe operator secrets'
+  }
+  return $warnings
+}
 
 function Get-PidFile {
   param([Parameter(Mandatory)][ValidateSet('master', 'worker')][string]$Name)

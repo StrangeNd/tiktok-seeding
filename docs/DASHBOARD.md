@@ -5,11 +5,13 @@ The dashboard is a local operator console for the master API. It helps manage pr
 ## Start
 
 ```powershell
+pnpm build:dashboard
 pnpm start:all
-pnpm dashboard
 ```
 
-Open <http://127.0.0.1:5173> and sign in with `MASTER_API_KEY` from your local `.env`.
+Open <http://127.0.0.1:7000/dashboard/> and sign in with `MASTER_API_KEY` from your local `.env`.
+
+For development only, `pnpm dashboard` still starts the Vite dev server on `DASHBOARD_PORT` (default `5173`).
 
 ## Pages
 
@@ -122,6 +124,7 @@ For Microsoft Graph, the imported account row must include `refreshtokenmail` an
 ## Security checklist
 
 - Never commit `.secrets/` real files.
+- Never commit `.env`.
 - Never paste real credentials into chat, issues, logs, or docs.
 - Rotate `CREDENTIALS_ENCRYPTION_KEY` only with a migration/re-import plan.
 - Keep the dashboard local unless you add proper network authentication/TLS.

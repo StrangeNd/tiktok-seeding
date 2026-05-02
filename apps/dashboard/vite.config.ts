@@ -8,8 +8,13 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, resolve(__dirname, '../..'), '');
   const dashboardPort = Number(env.DASHBOARD_PORT ?? 5173);
   const masterPort = Number(env.MASTER_PORT ?? 7000);
+  const dashboardBase = '/dashboard/';
   return {
+    base: dashboardBase,
     plugins: [react()],
+    build: {
+      sourcemap: false,
+    },
     server: {
       port: dashboardPort,
       strictPort: false,
@@ -19,6 +24,7 @@ export default defineConfig(({ mode }) => {
       // Default master URL baked at build-time. The operator can override this
       // at runtime from the Settings page (stored in localStorage).
       __MASTER_URL__: JSON.stringify(`http://127.0.0.1:${masterPort}`),
+      __DASHBOARD_BASE__: JSON.stringify(dashboardBase.replace(/\/$/, '')),
     },
   };
 });

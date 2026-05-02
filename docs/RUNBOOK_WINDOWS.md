@@ -36,12 +36,18 @@ All commands run from the worktree root.
 
 | Command                | What it does                                                                 |
 |------------------------|------------------------------------------------------------------------------|
-| `pnpm doctor`          | Pre-flight: Node, pnpm, .env, Postgres, Redis, GPM, port :7000               |
+| `pnpm setup:win`       | First-time setup: env stub, install, build, migrate, doctor                  |
+| `pnpm doctor`          | Pre-flight: Node, pnpm, .env, Postgres, Redis, GPM, port :7000, dashboard    |
 | `pnpm start:all`       | Runs `doctor`, then starts master + worker as detached processes             |
-| `pnpm dashboard`       | Starts the local operator dashboard on `DASHBOARD_PORT` (default :5173)      |
+| `pnpm dashboard`       | Development-only Vite dashboard on `DASHBOARD_PORT` (default :5173)          |
 | `pnpm status`          | Process state, port, /health/deep, heartbeat, profile pool, recent log tails |
+| `pnpm logs`            | Tail master/worker logs from `.runtime/`                                     |
+| `pnpm backup`          | Create `.env`, `.secrets/`, and Postgres backup under `.backups/`            |
+| `pnpm restore`         | Restore selected backup parts from `.backups/`                               |
+| `pnpm update`          | Backup, fast-forward, install, build, migrate                                |
 | `pnpm stop:all`        | Graceful taskkill /T of master + worker + orphan node.exe in this worktree   |
 | `pnpm restart:all`     | `stop:all` then `start:all`                                                  |
+| `pnpm release:check`   | Install/typecheck/lint/build validation for release readiness                |
 | `pnpm reset:profiles`  | Calls master `/admin/reset-stuck-profiles` to release orphan `in_use` rows   |
 
 Power-user flags:
@@ -53,6 +59,14 @@ pnpm stop:all  -- -Force            # immediate taskkill /F /T (no graceful)
 ```
 
 > Note the `--` separator: pnpm forwards everything after it to the script.
+
+Production-like dashboard URL after `pnpm start:all`:
+
+```text
+http://127.0.0.1:7000/dashboard/
+```
+
+If `MASTER_PORT` differs, replace `7000` with the configured port.
 
 ---
 

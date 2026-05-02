@@ -16,6 +16,9 @@ pids/
 
 # Local Windows operator runtime (PID files, rotating logs from scripts/windows/*)
 .runtime/
+.backups/
+.releases/
+.local-backup/
 
 # Operator-only sensitive material (account/proxy lists, exported dumps).
 # Examples (.example.txt) under .secrets/ are tracked deliberately.

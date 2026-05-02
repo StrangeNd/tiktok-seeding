@@ -1,4 +1,4 @@
-import { createLogger, loadEnv } from '@app/shared';
+import { createLogger, getConfigWarnings, loadEnv } from '@app/shared';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
 import Fastify from 'fastify';
@@ -11,10 +11,14 @@ import { orderRoutes } from './routes/orders.js';
 import { profileRoutes } from './routes/profiles.js';
 import { proxyRoutes } from './routes/proxies.js';
 import { workerRoutes } from './routes/workers.js';
+import { dashboardRoutes, isDashboardAssetRequest } from './routes/dashboard.js';
 import { resetStuckProfiles } from './services/recovery.js';
 
 const env = loadEnv();
 const log = createLogger('master');
+for (const warning of getConfigWarnings(env)) {
+  log.warn({ warning }, 'Unsafe production/operator configuration');
+}
 
 const app = Fastify({
   loggerInstance: log,
@@ -38,6 +42,7 @@ await app.register(cors, {
 app.addHook('onRequest', async (req, reply) => {
   const path = req.url.split('?')[0] ?? '';
   if (path === '/health' || path === '/health/deep') return;
+  if (isDashboardAssetRequest(req.method, path)) return;
   // Allow CORS preflight to pass through unauthenticated.
   if (req.method === 'OPTIONS') return;
   const key = req.headers['x-api-key'];
@@ -56,6 +61,7 @@ await app.register(jobRoutes);
 await app.register(profileRoutes);
 await app.register(accountRoutes);
 await app.register(proxyRoutes);
+await app.register(dashboardRoutes);
 
 // Graceful shutdown
 async function shutdown(signal: string) {
@@ -91,6 +97,7 @@ try {
 
   await app.listen({ port: env.MASTER_PORT, host: '0.0.0.0' });
   log.info(`✓ Master API listening on :${env.MASTER_PORT}`);
+  log.info(`✓ Dashboard available at http://127.0.0.1:${env.MASTER_PORT}/dashboard/`);
 } catch (err) {
   log.error({ err }, 'Listen failed');
   process.exit(1);

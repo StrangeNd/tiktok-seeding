@@ -1,7 +1,7 @@
 import { loadEnv } from '@app/shared';
 
 const env = loadEnv();
-const masterUrl = `http://127.0.0.1:${env.MASTER_PORT}`;
+const masterUrl = env.MASTER_URL ?? `http://127.0.0.1:${env.MASTER_PORT}`;
 
 async function postJson(path: string, body: unknown): Promise<unknown> {
   const r = await fetch(`${masterUrl}${path}`, {

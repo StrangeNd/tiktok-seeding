@@ -6,12 +6,41 @@ Quick-start for AI agents (Devin, Cursor, etc.) and human contributors.
 
 | Tool       | Version   | Notes                      |
 |------------|-----------|----------------------------|
-| Node.js    | >= 20     | See `.nvmrc`               |
-| pnpm       | 9.12+     | `corepack enable && pnpm --version` |
-| PostgreSQL | 14+       | Local or remote             |
-| Redis      | 6+        | Local or remote             |
+| Docker     | 24+       | Recommended (easiest setup)|
+| Node.js    | >= 20     | See `.nvmrc` (native only) |
+| pnpm       | 9.12+     | `corepack enable && pnpm --version` (native only) |
+| PostgreSQL | 14+       | Local or remote (native only) |
+| Redis      | 6+        | Local or remote (native only) |
 
-## Setup (one-time)
+## Setup — Docker (recommended)
+
+The fastest way to get everything running:
+
+```bash
+docker compose up
+```
+
+This starts Postgres, Redis, runs DB migrations, then starts master and worker.
+All services are pre-configured with mock GPM mode.
+
+```bash
+# Verify:
+curl http://localhost:7000/health
+
+# Run CLI commands against the Dockerized master:
+docker compose run --rm cli sync-profiles
+docker compose run --rm cli create-order -- --url=https://www.tiktok.com/@tiktok/live --count=2 --watch=20
+docker compose run --rm cli list-orders
+
+# View logs:
+docker compose logs -f master worker
+
+# Stop:
+docker compose down       # keep data
+docker compose down -v    # remove volumes
+```
+
+## Setup — Native (one-time)
 
 ```bash
 # 1. Install system deps (Ubuntu / Devin VM)
@@ -129,16 +158,46 @@ tiktok-seeding/
 ├── scripts/
 │   ├── setup-local.sh   # One-time local setup
 │   └── smoke-test.sh    # End-to-end smoke test
+├── Dockerfile           # Multi-stage build (master, worker, cli targets)
+├── docker-compose.yml   # Full stack: postgres + redis + master + worker
 └── docs/                # Architecture, plan, schema docs
+```
+
+## Docker Targets
+
+The `Dockerfile` uses multi-stage builds:
+
+```bash
+# Build specific target:
+docker build --target master -t seeding-master .
+docker build --target worker -t seeding-worker .
+docker build --target cli -t seeding-cli .
+
+# Run standalone (requires external Postgres + Redis):
+docker run --env-file .env -p 7000:7000 seeding-master
+```
+
+For production with real GPM, override environment in `docker-compose.yml`:
+
+```yaml
+# docker-compose.override.yml
+services:
+  master:
+    environment:
+      GPM_MODE: live
+  worker:
+    environment:
+      GPM_MODE: live
+      GPM_ENDPOINT: http://host.docker.internal:9495
 ```
 
 ## Known Blockers / Limitations
 
 - **GPM Login is Windows-only**: Real browser automation requires GPM Login
   running on Windows machines. Use `GPM_MODE=mock` for CI and cloud agents.
-- **No remote Postgres/Redis configured for Devin Cloud**: The smoke test
-  uses local instances. Set `DATABASE_URL` and `REDIS_URL` for remote services
-  if available.
 - **Puppeteer/Chrome not available in mock mode**: The worker skips real
   browser interaction in mock mode. Live mode requires Chrome + GPM on the
   target machine.
+- **Docker worker cannot reach host GPM directly**: Use `host.docker.internal`
+  or `--network host` when the worker container needs to reach GPM Login
+  running on the Docker host.

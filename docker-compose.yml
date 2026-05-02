@@ -1,0 +1,118 @@
+# Docker Compose for local development and production deployment.
+# Usage:
+#   docker compose up              # start all services
+#   docker compose up -d           # detached
+#   docker compose logs -f master  # follow master logs
+#   docker compose down -v         # stop + remove volumes
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: seeding
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      target: master
+    command: ["pnpm", "db:migrate"]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/seeding
+      REDIS_URL: redis://redis:6379
+      GPM_MODE: mock
+      MASTER_API_KEY: dev-key-change-me
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  master:
+    build:
+      context: .
+      target: master
+    restart: unless-stopped
+    ports:
+      - "7000:7000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/seeding
+      REDIS_URL: redis://redis:6379
+      GPM_MODE: mock
+      MASTER_PORT: "7000"
+      MASTER_API_KEY: dev-key-change-me
+      NODE_ENV: development
+      LOG_LEVEL: info
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:7000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      target: worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/seeding
+      REDIS_URL: redis://redis:6379
+      GPM_MODE: mock
+      MASTER_PORT: "7000"
+      MASTER_URL: http://master:7000
+      MASTER_API_KEY: dev-key-change-me
+      WORKER_NAME: worker-docker
+      CONCURRENCY: "5"
+      NODE_ENV: development
+      LOG_LEVEL: info
+    depends_on:
+      master:
+        condition: service_healthy
+
+  cli:
+    build:
+      context: .
+      target: cli
+    profiles: [cli]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/seeding
+      REDIS_URL: redis://redis:6379
+      GPM_MODE: mock
+      MASTER_PORT: "7000"
+      MASTER_URL: http://master:7000
+      MASTER_API_KEY: dev-key-change-me
+    depends_on:
+      master:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:

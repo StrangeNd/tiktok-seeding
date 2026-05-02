@@ -33,6 +33,8 @@ const envSchema = z.object({
   // ─── Master ───
   MASTER_PORT: z.coerce.number().int().min(1).max(65535).default(7000),
   MASTER_API_KEY: z.string().min(8).default('dev-key-change-me'),
+  /** Base URL for worker → master communication. Default derives from MASTER_PORT. */
+  MASTER_URL: z.string().url().optional(),
 
   // ─── Database ───
   DATABASE_URL: z.string().url(),

@@ -1,7 +1,7 @@
 import { loadEnv } from '@app/shared';
 
 const env = loadEnv();
-const baseUrl = `http://127.0.0.1:${env.MASTER_PORT}`;
+const baseUrl = env.MASTER_URL ?? `http://127.0.0.1:${env.MASTER_PORT}`;
 
 export async function masterFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();

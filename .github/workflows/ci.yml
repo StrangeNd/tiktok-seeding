@@ -104,7 +104,8 @@ jobs:
           done
           echo "services did not become ready in time"
           exit 1
-
+      - name: Build server for compiled runtime
+        run: pnpm build:server
       - name: Smoke test (mock GPM)
         run: bash scripts/smoke-test.sh
 

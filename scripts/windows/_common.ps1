@@ -40,6 +40,35 @@ function Get-EnvMap {
     }
     $map[$k] = $v
   }
+  foreach ($k in @(
+    'NODE_ENV',
+    'LOG_LEVEL',
+    'MASTER_PORT',
+    'MASTER_API_KEY',
+    'DATABASE_URL',
+    'REDIS_URL',
+    'GPM_MODE',
+    'GPM_ENDPOINT',
+    'GPM_API_PREFIX',
+    'GPM_API_KEY',
+    'WORKER_NAME',
+    'CONCURRENCY',
+    'DASHBOARD_PORT',
+    'CREDENTIALS_ENCRYPTION_KEY',
+    'PROXY_TEST_URL',
+    'PROXY_TEST_TIMEOUT_MS',
+    'MAIL_PROVIDER',
+    'MAIL_CODE_LOOKBACK_MINUTES',
+    'MAIL_CODE_MAX_RESULTS',
+    'MAIL_CODE_ALLOWED_SENDERS',
+    'MAIL_CODE_SUBJECT_HINTS',
+    'MAIL_CODE_REQUEST_COOLDOWN_SECONDS'
+  )) {
+    $processValue = [Environment]::GetEnvironmentVariable($k, 'Process')
+    if ($null -ne $processValue -and $processValue -ne '') {
+      $map[$k] = $processValue
+    }
+  }
   return $map
 }
 

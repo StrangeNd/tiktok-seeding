@@ -4,11 +4,13 @@
 #   -OnlyMaster   start just the master
 #   -OnlyWorker   start just the worker (master must already be up)
 #   -SkipDoctor   skip pre-flight checks (faster restart)
+#   -Dev          run tsx source runtime instead of compiled dist runtime
 #
 # Behavior:
 #   - Refuses to start if PID file exists AND that PID is alive (idempotent).
 #   - Cleans stale PID files for dead processes.
 #   - Detects port :7000 occupied by a foreign process and aborts with guidance.
+#   - Production/default mode runs compiled JavaScript with node.
 #   - Streams output into .runtime\<name>.log and .runtime\<name>.err.log.
 #   - Waits for /health 200 before declaring master ready.
 
@@ -16,7 +18,8 @@
 param(
   [switch]$OnlyMaster,
   [switch]$OnlyWorker,
-  [switch]$SkipDoctor
+  [switch]$SkipDoctor,
+  [switch]$Dev
 )
 
 . "$PSScriptRoot\_common.ps1"
@@ -29,6 +32,28 @@ if (-not $SkipDoctor) {
     exit 1
   }
 }
+
+function Assert-RequiredBuilds {
+  if ($Dev) { return }
+  $required = @(
+    'apps\dashboard\dist\index.html',
+    'apps\master\dist\index.js',
+    'apps\worker\dist\index.js',
+    'packages\shared\dist\index.js',
+    'packages\gpm-client\dist\index.js',
+    'packages\tiktok-actions\dist\index.js'
+  )
+  foreach ($rel in $required) {
+    $full = Join-Path $script:RepoRoot $rel
+    if (-not (Test-Path $full)) {
+      Write-Fail "Missing compiled runtime artifact: $rel"
+      Write-Host 'Run `pnpm build` before `pnpm start:all`, or use `pnpm start:all:dev` for source/dev mode.' -ForegroundColor Yellow
+      exit 1
+    }
+  }
+}
+
+Assert-RequiredBuilds
 
 function Start-AppProcess {
   param(
@@ -56,14 +81,19 @@ function Start-AppProcess {
     }
   }
 
-  $pkg     = "@app/$Name"
   $logOut  = Get-LogFile $Name 'out'
   $logErr  = Get-LogFile $Name 'err'
   # Truncate previous logs on startup (operator wants a clean slate per run).
   Set-Content -Path $logOut -Value '' -Encoding utf8 -ErrorAction SilentlyContinue
   Set-Content -Path $logErr -Value '' -Encoding utf8 -ErrorAction SilentlyContinue
 
-  $cmd = "pnpm --filter $pkg run start > `"$logOut`" 2> `"$logErr`""
+  if ($Dev) {
+    $pkg = "@app/$Name"
+    $cmd = "pnpm --filter $pkg run start:dev > `"$logOut`" 2> `"$logErr`""
+  } else {
+    $entry = Join-Path $script:RepoRoot "apps\$Name\dist\index.js"
+    $cmd = "set NODE_ENV=production&& node `"$entry`" > `"$logOut`" 2> `"$logErr`""
+  }
   Write-Step "Starting $Name : $cmd"
 
   # Detach via cmd.exe /c so the process tree survives PowerShell exit.

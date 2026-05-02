@@ -35,7 +35,16 @@
     "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/backup.ps1",
     "restore": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/restore.ps1",
     "update": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/update.ps1",
-    "reset:profiles": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/reset-profiles.ps1"
+    "reset:profiles": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/reset-profiles.ps1",
+    "shortcuts:create": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/create-shortcuts.ps1",
+    "pm2:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-install.ps1",
+    "pm2:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-start.ps1",
+    "pm2:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-stop.ps1",
+    "pm2:status": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-status.ps1",
+    "pm2:logs": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-logs.ps1",
+    "pm2:remove": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/pm2-remove.ps1",
+    "service:start": "pnpm pm2:start",
+    "service:stop": "pnpm pm2:stop"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

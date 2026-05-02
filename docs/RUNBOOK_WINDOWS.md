@@ -51,6 +51,11 @@ All commands run from the worktree root.
 | `pnpm restart:all`     | `stop:all` then `start:all`                                                  |
 | `pnpm release:check`   | Install/typecheck/lint/build validation for release readiness                |
 | `pnpm reset:profiles`  | Calls master `/admin/reset-stuck-profiles` to release orphan `in_use` rows   |
+| `pnpm shortcuts:create` | Creates desktop shortcuts for start/stop/restart/dashboard/logs/backup      |
+| `pnpm pm2:start`       | Optional PM2 compiled-runtime start helper                                   |
+| `pnpm pm2:status`      | Optional PM2 status helper                                                   |
+| `pnpm pm2:logs`        | Optional PM2 logs helper                                                     |
+| `pnpm pm2:stop`        | Optional PM2 stop/remove helper                                              |
 
 Power-user flags:
 
@@ -118,8 +123,7 @@ pnpm status                                    # verify everything still healthy
 pnpm stop:all                                  # clean shutdown
 ```
 
-Dashboard login uses `MASTER_API_KEY` from local `.env`. See `docs/DASHBOARD.md`
-for account/proxy import, mailbox OAuth2 code retrieval, and security notes.
+Dashboard login uses local users. The first registered dashboard user becomes admin. See `docs/DASHBOARD.md` for roles, account/proxy import, mailbox OAuth2 code retrieval, and security notes.
 
 ---
 
@@ -181,7 +185,8 @@ This was the single biggest pain point before this hardening. Mitigations:
 | `ProfileInUse` errors                                | A previous tab didn't close. `pnpm reset:profiles` then retry.                |
 | Worker logs show heartbeat failing                   | Master is down or `MASTER_API_KEY` mismatch between `.env` and master.        |
 | `pnpm status` shows worker PID file but no live node | Worker crashed; `pnpm start:all -- -OnlyWorker` to relaunch it.               |
-| Dashboard login fails                                | Verify master is up, `MASTER_API_KEY` is correct, and browser points at :7000. |
+| Dashboard login fails                                | Verify master is up, browser points at :7000, and the user is active.          |
+| First dashboard login has no users                   | Open `/dashboard/register`; the first registered user becomes admin.          |
 | Mail code returns `provider_unsupported`             | Set `MAIL_PROVIDER=microsoft` for Microsoft Graph or keep `custom` disabled.  |
 | Mail code returns `missing_oauth`                    | Account row lacks email, mailbox refresh token, or mailbox client id.         |
 | Mail code returns `token_failed`                     | Refresh token/client id/scope is invalid or revoked. Re-authorize mailbox.    |
@@ -200,6 +205,8 @@ scripts/windows/
 ├── restart.ps1          stop + start
 ├── status.ps1           one-screen overview
 └── reset-profiles.ps1   wraps /admin/reset-stuck-profiles
+├── create-shortcuts.ps1 creates desktop shortcuts
+├── pm2-*.ps1            optional PM2 service-style helpers
 
 apps/master/src/services/recovery.ts   # the SQL that releases stuck profiles
 apps/worker/src/job-runner.ts          # hard timeout + connect timeout

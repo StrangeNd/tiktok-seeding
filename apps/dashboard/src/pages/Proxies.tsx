@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, EmptyState, ErrorState, Spinner, StatusBadge, fmtRelTime } from '../components/ui';
 import { api } from '../lib/api';
 import { useFetch } from '../lib/useFetch';
+import { useAuth } from '../store/auth';
 import { toast } from '../store/toast';
 
 interface SafeProxy {
@@ -17,6 +18,7 @@ interface SafeProxy {
   lastCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  assignedAccountCount: number;
 }
 
 interface SafeProxyParsedRow {
@@ -42,6 +44,7 @@ export function Proxies() {
   const [statusFilter, setStatusFilter] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
+  const canImport = useAuth((s) => s.hasPermission('proxies:import'));
   const path = `/proxies${statusFilter ? `?status=${statusFilter}` : ''}`;
   const list = useFetch<{ items: SafeProxy[]; total: number }>(path, { intervalMs: 30_000 });
 
@@ -75,6 +78,17 @@ export function Proxies() {
     }
   }
 
+  async function rebalance() {
+    try {
+      const r = await api<{ assigned: number }>('/proxies/rebalance-assignments', {
+        method: 'POST',
+      });
+      toast.success('Assignments rebalanced', `${r.assigned} accounts assigned`);
+      list.reload();
+    } catch (e) {
+      toast.error('Rebalance failed', (e as Error).message);
+    }
+  }
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -99,9 +113,16 @@ export function Proxies() {
           <button type="button" className="btn" onClick={testAll}>
             Test all (max 50)
           </button>
-          <button type="button" className="btn-primary" onClick={() => setImportOpen(true)}>
-            Import proxies
-          </button>
+          {canImport && (
+            <button type="button" className="btn" onClick={rebalance}>
+              Rebalance assignments
+            </button>
+          )}
+          {canImport && (
+            <button type="button" className="btn-primary" onClick={() => setImportOpen(true)}>
+              Import proxies
+            </button>
+          )}
         </div>
       </div>
 
@@ -117,9 +138,11 @@ export function Proxies() {
             title="No proxies yet"
             hint="Use Import proxies to paste your proxy list."
             action={
-              <button type="button" className="btn-primary" onClick={() => setImportOpen(true)}>
-                Import proxies
-              </button>
+              canImport ? (
+                <button type="button" className="btn-primary" onClick={() => setImportOpen(true)}>
+                  Import proxies
+                </button>
+              ) : undefined
             }
           />
         ) : (
@@ -131,6 +154,7 @@ export function Proxies() {
                 <th>Auth</th>
                 <th>Status</th>
                 <th>Latency</th>
+                <th>Accounts</th>
                 <th>Last error</th>
                 <th>Last checked</th>
                 <th />
@@ -158,6 +182,7 @@ export function Proxies() {
                   <td className="text-text-muted">
                     {p.latencyMs != null ? `${p.latencyMs}ms` : '—'}
                   </td>
+                  <td className="text-text-muted">{p.assignedAccountCount}</td>
                   <td
                     className="text-xs text-text-muted max-w-[260px] truncate"
                     title={p.lastError ?? ''}
@@ -189,7 +214,7 @@ export function Proxies() {
         </div>
       )}
 
-      {importOpen && (
+      {importOpen && canImport && (
         <ImportProxiesModal
           onClose={() => {
             setImportOpen(false);

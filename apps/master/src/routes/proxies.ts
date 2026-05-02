@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { writeAuditLog } from '../services/audit.js';
 import {
   buildProxyImportPreview,
   getProxiesSummary,
@@ -8,6 +9,8 @@ import {
   setProxyStatus,
   testProxyConnectivity,
 } from '../services/proxies.js';
+import { rebalanceProxyAssignments } from '../services/proxy-assignment.js';
+import { requirePermission } from './auth.js';
 
 const previewSchema = z.object({ text: z.string().max(2_000_000) });
 const importSchema = z.object({ text: z.string().max(2_000_000), confirm: z.literal(true) });
@@ -26,19 +29,43 @@ export async function proxyRoutes(app: FastifyInstance): Promise<void> {
   app.get('/proxies/summary', async () => getProxiesSummary());
 
   app.post('/proxies/import/preview', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'proxies:import');
+    if (!user) return;
     const parsed = previewSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     }
-    return buildProxyImportPreview(parsed.data.text);
+    const result = await buildProxyImportPreview(parsed.data.text);
+    await writeAuditLog({
+      actor: user,
+      action: 'proxy.import.preview',
+      entityType: 'proxy',
+      metadata: { total: result.total, valid: result.valid, invalid: result.invalid },
+    });
+    return result;
   });
 
   app.post('/proxies/import', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'proxies:import');
+    if (!user) return;
     const parsed = importSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'invalid_body', issues: parsed.error.issues });
     }
-    return importProxiesFromText(parsed.data.text);
+    const result = await importProxiesFromText(parsed.data.text);
+    await writeAuditLog({
+      actor: user,
+      action: 'proxy.import.saved',
+      entityType: 'proxy',
+      metadata: { inserted: result.inserted, skipped: result.skipped, total: result.total },
+    });
+    return result;
+  });
+
+  app.post('/proxies/rebalance-assignments', async (req, reply) => {
+    const user = await requirePermission(req, reply, 'proxies:import');
+    if (!user) return;
+    return rebalanceProxyAssignments(user);
   });
 
   app.post('/proxies/:id/test-connectivity', async (req, reply) => {

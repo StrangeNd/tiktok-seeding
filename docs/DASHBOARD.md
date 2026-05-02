@@ -9,7 +9,9 @@ pnpm build
 pnpm start:all
 ```
 
-Open <http://127.0.0.1:7000/dashboard/> and sign in with `MASTER_API_KEY` from your local `.env`.
+Open <http://127.0.0.1:7000/dashboard/> and sign in with a local dashboard user.
+
+The first registered user becomes `admin`. Later self-registered users become `user` accounts and may be `active` immediately or `pending` depending on `AUTH_REQUIRE_ADMIN_APPROVAL`.
 
 For development only, `pnpm start:all:dev` runs source services and `pnpm dashboard` starts the Vite dev server on `DASHBOARD_PORT` (default `5173`).
 
@@ -24,7 +26,22 @@ For development only, `pnpm start:all:dev` runs source services and `pnpm dashbo
 | Orders | Create and inspect live-view orders. |
 | Activity | Recent jobs across orders. |
 | Admin | Health checks and safe recovery actions. |
+| Users | Admin-only local user management. |
+| Audit | Safe audit log view. Admins see all logs; users see their allowed operational logs. |
 | Settings | Master URL/API-key local browser settings and security reminders. |
+
+## Users, roles, and sessions
+
+Dashboard auth uses a local username/password login and an HttpOnly session cookie.
+
+Roles:
+
+- **Admin**: import accounts/proxies, create orders, view logs/status, manage users, view audit logs, and run admin recovery actions.
+- **User**: view dashboard/status/logs, create orders, import accounts, and view masked accounts/proxies.
+
+Users cannot manage users or run admin recovery actions. Users can import proxies only when `USER_CAN_IMPORT_PROXIES=true`.
+
+Passwords are stored as `scrypt` hashes. The API does not return password hashes, session tokens, auth secrets, encrypted blobs, cookies, mailbox refresh tokens, or proxy passwords.
 
 ## Account import format
 
@@ -61,6 +78,12 @@ socks5://username:password@host:port
 ```
 
 Proxy passwords are encrypted and never returned by the API. Connectivity checks use a generic TCP reachability probe and do not target TikTok or any platform-specific endpoint.
+
+## Proxy assignment
+
+When accounts or proxies are imported, the backend can rebalance account-to-proxy assignments using a deterministic round-robin strategy ordered by account id and proxy id.
+
+The account table shows only the assigned proxy protocol/host/port label and status. The proxy table shows assigned account counts. Proxy passwords are not exposed.
 
 ## Mailbox OAuth2 code retrieval
 
@@ -125,6 +148,7 @@ For Microsoft Graph, the imported account row must include `refreshtokenmail` an
 
 - Never commit `.secrets/` real files.
 - Never commit `.env`.
+- Set a non-default `AUTH_SESSION_SECRET` before production-like use.
 - Never paste real credentials into chat, issues, logs, or docs.
 - Rotate `CREDENTIALS_ENCRYPTION_KEY` only with a migration/re-import plan.
 - Keep the dashboard local unless you add proper network authentication/TLS.

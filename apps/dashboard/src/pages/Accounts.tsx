@@ -29,6 +29,7 @@ interface SafeAccount {
   lastMailCodeCheckedAt: string | null;
   lastError: string | null;
   updatedAt: string;
+  assignedProxy: { id: number; label: string; status: string } | null;
 }
 
 interface SafeParsedRow {
@@ -137,6 +138,7 @@ export function Accounts() {
                 <th>Email</th>
                 <th>Status</th>
                 <th>Cookie</th>
+                <th>Assigned proxy</th>
                 <th>Mailbox OAuth2</th>
                 <th>Last code check</th>
                 <th>Last error</th>
@@ -157,6 +159,9 @@ export function Accounts() {
                       <StatusBadge status={a.cookieStatus} />
                       <MaskedFlag has={a.hasCookie} label="cookie" />
                     </div>
+                  </td>
+                  <td className="font-mono text-xs text-text-muted">
+                    {a.assignedProxy ? `${a.assignedProxy.label} (${a.assignedProxy.status})` : '—'}
                   </td>
                   <td>
                     <div className="flex flex-wrap gap-1">

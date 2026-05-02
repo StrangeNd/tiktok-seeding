@@ -110,6 +110,20 @@ if (-not $latestRelease) {
 
 Write-Step "Release check: package exclusions ($($latestRelease.Name))"
 foreach ($rel in @(
+  'apps\master\drizzle\0002_magenta_manta.sql',
+  'scripts\windows\create-shortcuts.ps1',
+  'scripts\windows\pm2-start.ps1',
+  'scripts\windows\pm2-stop.ps1',
+  'scripts\windows\pm2-status.ps1',
+  'scripts\windows\pm2-logs.ps1',
+  'scripts\windows\pm2-remove.ps1'
+)) {
+  if (-not (Test-Path (Join-Path $latestRelease.FullName $rel))) {
+    Write-Fail "Release package is missing required path: $rel"
+    exit 1
+  }
+}
+foreach ($rel in @(
   '.git',
   '.env',
   '.env.local',

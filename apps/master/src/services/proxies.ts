@@ -14,8 +14,9 @@ import { createConnection } from 'node:net';
 import { createLogger, loadEnv } from '@app/shared';
 import { sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { type Proxy as ProxyRow, proxies } from '../db/schema.js';
+import { type Proxy as ProxyRow, accountProxyAssignments, proxies } from '../db/schema.js';
 import { encryptJson } from '../lib/crypto.js';
+import { rebalanceProxyAssignments } from './proxy-assignment.js';
 
 const log = createLogger('proxies');
 const env = loadEnv();
@@ -233,6 +234,7 @@ export async function importProxiesFromText(text: string): Promise<ProxyImportRe
     return { inserted: 0, skipped: parsed.length, total: parsed.length };
   }
   await db.insert(proxies).values(toInsert);
+  await rebalanceProxyAssignments();
   log.info({ inserted: toInsert.length }, 'Proxies imported');
   return {
     inserted: toInsert.length,
@@ -254,9 +256,10 @@ export interface SafeProxy {
   lastCheckedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  assignedAccountCount: number;
 }
 
-function toSafeProxy(p: ProxyRow): SafeProxy {
+function toSafeProxy(p: ProxyRow, assignedAccountCount = 0): SafeProxy {
   return {
     id: p.id,
     protocol: p.protocol,
@@ -270,6 +273,7 @@ function toSafeProxy(p: ProxyRow): SafeProxy {
     lastCheckedAt: p.lastCheckedAt ? p.lastCheckedAt.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+    assignedAccountCount,
   };
 }
 
@@ -284,9 +288,14 @@ export async function listProxies(
   const offset = opts.offset ?? 0;
   const where = opts.status ? eq(proxies.status, opts.status) : undefined;
   const rows = await db
-    .select()
+    .select({
+      proxy: proxies,
+      assignedAccountCount: drizzleSql<number>`count(${accountProxyAssignments.accountId})::int`,
+    })
     .from(proxies)
+    .leftJoin(accountProxyAssignments, eq(accountProxyAssignments.proxyId, proxies.id))
     .where(where)
+    .groupBy(proxies.id)
     .orderBy(drizzleSql`${proxies.id} desc`)
     .limit(limit)
     .offset(offset);
@@ -295,7 +304,10 @@ export async function listProxies(
     .from(proxies)
     .where(where);
   const count = countRow?.count ?? 0;
-  return { items: rows.map(toSafeProxy), total: count };
+  return {
+    items: rows.map((row) => toSafeProxy(row.proxy, row.assignedAccountCount)),
+    total: count,
+  };
 }
 
 export async function getProxiesSummary(): Promise<{

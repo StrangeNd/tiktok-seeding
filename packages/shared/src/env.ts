@@ -73,12 +73,27 @@ const envSchema = z.object({
   MAIL_CODE_ALLOWED_SENDERS: z.string().optional(),
   MAIL_CODE_SUBJECT_HINTS: z.string().optional(),
   MAIL_CODE_REQUEST_COOLDOWN_SECONDS: z.coerce.number().int().min(0).max(300).default(30),
+
+  AUTH_SESSION_SECRET: z.string().min(16).default('dev-auth-session-secret-change-me-32+ch'),
+  AUTH_ALLOW_SELF_REGISTER: z
+    .string()
+    .default('true')
+    .transform((v) => v === 'true' || v === '1'),
+  AUTH_REQUIRE_ADMIN_APPROVAL: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  USER_CAN_IMPORT_PROXIES: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
 
 const DEFAULT_MASTER_API_KEY = 'dev-key-change-me';
 const DEFAULT_CREDENTIALS_ENCRYPTION_KEY = 'dev-credentials-key-change-me-please-32+ch';
+const DEFAULT_AUTH_SESSION_SECRET = 'dev-auth-session-secret-change-me-32+ch';
 
 let cached: AppEnv | null = null;
 
@@ -120,9 +135,16 @@ export function getConfigWarnings(env: AppEnv): string[] {
     env.NODE_ENV === 'production' &&
     (env.MASTER_API_KEY === DEFAULT_MASTER_API_KEY ||
       env.CREDENTIALS_ENCRYPTION_KEY === DEFAULT_CREDENTIALS_ENCRYPTION_KEY ||
+      env.AUTH_SESSION_SECRET === DEFAULT_AUTH_SESSION_SECRET ||
       env.CREDENTIALS_ENCRYPTION_KEY.length < 32)
   ) {
     warnings.push('NODE_ENV=production is running with unsafe operator secrets');
+  }
+  if (
+    env.AUTH_SESSION_SECRET === DEFAULT_AUTH_SESSION_SECRET ||
+    env.AUTH_SESSION_SECRET.length < 32
+  ) {
+    warnings.push('AUTH_SESSION_SECRET is default or shorter than 32 characters');
   }
   return warnings;
 }

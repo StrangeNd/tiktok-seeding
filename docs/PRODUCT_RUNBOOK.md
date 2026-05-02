@@ -47,10 +47,13 @@ Do not commit `.env` or real `.secrets/*` files.
 | `pnpm start:all` | Start compiled master and worker as detached local processes. |
 | `pnpm start:all:dev` | Maintainer-only source/dev runtime using `tsx`. |
 | `pnpm status` | Show health, workers, queues, profile/order/job counts, warnings, and recent logs. |
+| `pnpm ports` | Show configured/common runtime port owners, command lines, and safe action guidance. |
 | `pnpm logs` | Print recent master and worker logs. |
 | `pnpm logs -- -Follow` | Follow logs live. |
 | `pnpm restart:all` | Stop and start master/worker safely. |
 | `pnpm stop:all` | Stop master/worker for this checkout. |
+| `pnpm close:all` | Hard close repo-owned runtime processes, clear PID files, and free repo-owned runtime ports. |
+| `pnpm kill:runtime` | Alias for `pnpm close:all`. |
 | `pnpm backup` | Create a timestamped backup under `.backups/`. |
 | `pnpm restore -- -BackupPath .backups\YYYYMMDD-HHMMSS -RestoreEnv -RestoreSecrets -RestoreDatabase` | Restore selected backup parts. |
 | `pnpm update` | Backup, fast-forward current branch, install, build, and migrate. |
@@ -105,6 +108,41 @@ If `MASTER_PORT` differs in `.env`, replace `7000` with that port.
 Create the first dashboard user from **Register**. The first registered user becomes `admin`. Later self-registered users become `user` accounts and may require admin approval if `AUTH_REQUIRE_ADMIN_APPROVAL=true`.
 
 Dashboard sessions use HttpOnly cookies. Raw account, mailbox, cookie, auth, and proxy secrets are never returned to the dashboard.
+
+## Desktop shortcuts and stale runtime recovery
+
+Create daily-use shortcuts:
+
+```powershell
+pnpm shortcuts:create
+```
+
+The shortcuts are:
+
+- **Start TikTok Seeding**
+- **Stop TikTok Seeding**
+- **Restart TikTok Seeding**
+- **Close TikTok Seeding**
+- **Open TikTok Seeding Dashboard**
+- **TikTok Seeding Logs**
+- **TikTok Seeding Backup**
+
+Use **Close TikTok Seeding** or `pnpm close:all` when the dashboard or API appears stale after an update. Stale `node.exe` processes can keep port `7000` or a validation port open and make requests hit old code. Diagnose with:
+
+```powershell
+pnpm status
+pnpm ports
+netstat -ano | findstr ":7000"
+```
+
+Then recover safely:
+
+```powershell
+pnpm close:all
+pnpm start:all
+```
+
+The close/stop scripts kill only repo-owned master/worker runtime processes. If a port is held by a foreign process, they report it and leave it alone.
 
 ## Managing operator data
 
@@ -233,7 +271,7 @@ pnpm pm2:stop
 
 Only run `pm2 startup` if the operator intentionally wants PM2 to register startup services on that machine.
 
-Create daily-use desktop shortcuts:
+Create or update daily-use desktop shortcuts:
 
 ```powershell
 pnpm shortcuts:create
@@ -254,7 +292,8 @@ Logs are written under `.runtime/pm2-*.log` and `.runtime/pm2-*.err.log`.
 
 - Run `pnpm doctor` first.
 - If the dashboard build is missing, run `pnpm build:dashboard`.
-- If port `MASTER_PORT` is occupied, run `pnpm status` to identify the owner. Do not kill unrelated processes blindly.
+- If port `MASTER_PORT` is occupied, run `pnpm status` or `pnpm ports` to identify the owner. Do not kill unrelated processes blindly.
+- If the dashboard acts stale, run `pnpm close:all` then `pnpm start:all`.
 - If `GPM_MODE=live`, GPM Login must be running and reachable.
 - If secrets fail to decrypt, confirm `CREDENTIALS_ENCRYPTION_KEY` matches the key used during import.
 - If mailbox code retrieval returns `provider_unsupported`, set `MAIL_PROVIDER=microsoft` only after configuring owned Microsoft mailbox OAuth2 credentials.

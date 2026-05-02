@@ -148,15 +148,115 @@ function Test-ProcessRunning {
 
 function Test-PortListening {
   param([Parameter(Mandatory)][int]$Port)
-  $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
-  return [bool]$c
+  return (@(Get-PortOwners $Port).Count -gt 0)
 }
 
 function Get-PortOwner {
   param([Parameter(Mandatory)][int]$Port)
-  $c = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $c) { return $null }
-  return [int]$c.OwningProcess
+  @(Get-PortOwners $Port) | Select-Object -First 1
+}
+
+function Get-PortOwners {
+  param([Parameter(Mandatory)][int]$Port)
+  $owners = @()
+  try {
+    $lines = & netstat.exe -ano 2>$null
+  } catch {
+    return @()
+  }
+  foreach ($line in $lines) {
+    $parts = ([string]$line).Trim() -split '\s+'
+    if ($parts.Count -lt 5) { continue }
+    if ($parts[0] -ne 'TCP') { continue }
+    $localAddress = $parts[1]
+    $state = $parts[$parts.Count - 2]
+    if ($state -ne 'LISTENING') { continue }
+    if (-not $localAddress.EndsWith(":$Port")) { continue }
+    $pidText = $parts[$parts.Count - 1]
+    $parsedPid = 0
+    if ([int]::TryParse($pidText, [ref]$parsedPid)) { $owners += $parsedPid }
+  }
+  return @($owners | Where-Object { $_ } | Sort-Object -Unique)
+}
+
+function Get-ProcessInfo {
+  param([Parameter(Mandatory)][int]$ProcessId)
+  Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction SilentlyContinue
+}
+
+function Test-RepoOwnedRuntimeProcess {
+  param($Process)
+  if (-not $Process) { return $false }
+  $name = [string]$Process.Name
+  if ($name -notin @('node.exe', 'cmd.exe', 'powershell.exe', 'pwsh.exe')) { return $false }
+  $cmd = [string]$Process.CommandLine
+  if (-not $cmd) { return $false }
+  if (-not $cmd.Contains($script:RepoRoot)) { return $false }
+  foreach ($marker in @(
+    'apps\master',
+    'apps\worker',
+    'apps/master',
+    'apps/worker',
+    'dist\index.js',
+    'dist/index.js',
+    'tsx src/index.ts'
+  )) {
+    if ($cmd.Contains($marker)) { return $true }
+  }
+  return $false
+}
+
+function Get-RepoRuntimeProcesses {
+  $names = @("Name='node.exe'", "Name='cmd.exe'", "Name='powershell.exe'", "Name='pwsh.exe'")
+  $found = @()
+  foreach ($filter in $names) {
+    $found += Get-CimInstance Win32_Process -Filter $filter -ErrorAction SilentlyContinue |
+      Where-Object { Test-RepoOwnedRuntimeProcess $_ }
+  }
+  return @($found | Sort-Object ProcessId -Unique)
+}
+
+function Stop-RepoRuntimeProcess {
+  param([Parameter(Mandatory)]$Process)
+  if (-not (Test-RepoOwnedRuntimeProcess $Process)) { return $false }
+  Write-Warn2 "Killing repo-owned runtime process PID=$($Process.ProcessId) name=$($Process.Name)"
+  & taskkill.exe /F /T /PID $Process.ProcessId 2>&1 | Out-Null
+  Start-Sleep -Milliseconds 500
+  return -not (Test-ProcessRunning ([int]$Process.ProcessId))
+}
+
+function Get-RuntimePorts {
+  $ports = @((Get-MasterPort), 7000, 7101)
+  $portFile = Join-Path $script:RuntimeDir 'ports.txt'
+  if (Test-Path $portFile) {
+    foreach ($line in Get-Content $portFile -ErrorAction SilentlyContinue) {
+      $port = 0
+      if ([int]::TryParse($line.Trim(), [ref]$port)) { $ports += $port }
+    }
+  }
+  return @($ports | Where-Object { $_ -gt 0 } | Sort-Object -Unique)
+}
+
+function Save-RuntimePort {
+  param([Parameter(Mandatory)][int]$Port)
+  $ports = @(Get-RuntimePorts) + $Port
+  $ports | Sort-Object -Unique | Set-Content -Path (Join-Path $script:RuntimeDir 'ports.txt') -Encoding ascii
+}
+
+function Get-PortReport {
+  param([Parameter(Mandatory)][int]$Port)
+  $rows = @()
+  foreach ($owner in Get-PortOwners $Port) {
+    $proc = Get-ProcessInfo $owner
+    $rows += [pscustomobject]@{
+      Port = $Port
+      ProcessId = $owner
+      Name = if ($proc) { $proc.Name } else { $null }
+      CommandLine = if ($proc) { $proc.CommandLine } else { $null }
+      RepoOwned = Test-RepoOwnedRuntimeProcess $proc
+    }
+  }
+  return $rows
 }
 
 function Stop-ProcessTree {

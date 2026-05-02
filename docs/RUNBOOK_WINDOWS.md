@@ -42,16 +42,19 @@ All commands run from the worktree root.
 | `pnpm start:all`       | Runs `doctor`, then starts compiled master + worker with `node`              |
 | `pnpm start:all:dev`   | Maintainer-only source/dev runtime using `tsx`                               |
 | `pnpm dashboard`       | Development-only Vite dashboard on `DASHBOARD_PORT` (default :5173)          |
-| `pnpm status`          | Process state, port, /health/deep, heartbeat, profile pool, recent log tails |
+| `pnpm status`          | Non-hanging health, port owner, repo ownership, worker PIDs, dashboard URL   |
+| `pnpm ports`           | Port diagnostics using `Get-NetTCPConnection` plus `netstat` fallback        |
 | `pnpm logs`            | Tail master/worker logs from `.runtime/`                                     |
 | `pnpm backup`          | Create `.env`, `.secrets/`, and Postgres backup under `.backups/`            |
 | `pnpm restore`         | Restore selected backup parts from `.backups/`                               |
 | `pnpm update`          | Backup, fast-forward, install, build, migrate                                |
-| `pnpm stop:all`        | Graceful taskkill /T of master + worker + orphan node.exe in this worktree   |
+| `pnpm stop:all`        | Stop master + worker + repo-owned orphan runtime processes                   |
+| `pnpm close:all`       | Hard close all repo-owned runtime processes and clear PID files              |
+| `pnpm kill:runtime`    | Alias for `pnpm close:all`                                                   |
 | `pnpm restart:all`     | `stop:all` then `start:all`                                                  |
 | `pnpm release:check`   | Install/typecheck/lint/build validation for release readiness                |
 | `pnpm reset:profiles`  | Calls master `/admin/reset-stuck-profiles` to release orphan `in_use` rows   |
-| `pnpm shortcuts:create` | Creates desktop shortcuts for start/stop/restart/dashboard/logs/backup      |
+| `pnpm shortcuts:create` | Creates desktop shortcuts for start/stop/restart/close/dashboard/logs/backup |
 | `pnpm pm2:start`       | Optional PM2 compiled-runtime start helper                                   |
 | `pnpm pm2:status`      | Optional PM2 status helper                                                   |
 | `pnpm pm2:logs`        | Optional PM2 logs helper                                                     |
@@ -64,6 +67,7 @@ pnpm start:all -- -SkipDoctor       # skip pre-flight (faster restarts)
 pnpm start:all:dev                  # explicit source/dev runtime
 pnpm start:all -- -OnlyMaster       # leave worker alone
 pnpm stop:all  -- -Force            # immediate taskkill /F /T (no graceful)
+pnpm close:all                      # hard close repo-owned stale runtime
 ```
 
 > Note the `--` separator: pnpm forwards everything after it to the script.
@@ -123,6 +127,14 @@ pnpm status                                    # verify everything still healthy
 pnpm stop:all                                  # clean shutdown
 ```
 
+The same actions are available through desktop shortcuts after:
+
+```powershell
+pnpm shortcuts:create
+```
+
+Use **Start TikTok Seeding** for normal startup, **Stop TikTok Seeding** for normal shutdown, **Restart TikTok Seeding** for a fresh restart, **Close TikTok Seeding** for hard close, **Open TikTok Seeding Dashboard** for the dashboard, and **TikTok Seeding Logs** for log tails.
+
 Dashboard login uses local users. The first registered dashboard user becomes admin. See `docs/DASHBOARD.md` for roles, account/proxy import, mailbox OAuth2 code retrieval, and security notes.
 
 ---
@@ -163,14 +175,28 @@ shows up clearly in `pnpm --filter @app/cli run list-orders -- --id=<n>`.
 This was the single biggest pain point before this hardening. Mitigations:
 
 - `.runtime\master.pid` and `worker.pid` track the wrapper PID per worktree.
-- `pnpm doctor` flags port `:7000` if held by a foreign PID.
-- `pnpm start:all` refuses to start if PID file points at a live process
-  (idempotent — re-running is safe).
-- `pnpm stop:all` stops the process tree and scans for orphan `node.exe` whose
-  command line includes this worktree path and app marker.
-- `pnpm stop:all` only kills processes whose command line points at THIS
-  worktree, so it won't disturb other Cascade sessions / worktrees on the
-  same machine.
+- `pnpm status` and `pnpm ports` show port owner PID, command line, and whether the owner belongs to this repo.
+- `pnpm start:all` clears repo-owned stale `MASTER_PORT` owners before start, but fails clearly if a foreign process owns the port.
+- `pnpm stop:all` stops PID-file processes, scans repo-owned `node.exe`/`cmd.exe`/PowerShell runtime wrappers, and validates runtime ports are free.
+- `pnpm close:all` is the hard-close operator control. It kills all repo-owned master/worker runtime processes, removes `.runtime\*.pid`, and leaves `.env`, `.secrets`, backups, releases, and unrelated processes alone.
+- `pnpm stop:all` and `pnpm close:all` only kill processes whose command line points at THIS worktree and master/worker runtime markers, so they won't disturb unrelated Node processes.
+
+If the dashboard acts stale after a code update:
+
+```powershell
+pnpm status
+pnpm ports
+pnpm close:all
+pnpm start:all
+```
+
+To inspect the port manually:
+
+```powershell
+netstat -ano | findstr ":7000"
+```
+
+Never kill an unrelated process blindly. If the PID is foreign, stop the owning application or change `MASTER_PORT`.
 
 ---
 
@@ -178,7 +204,8 @@ This was the single biggest pain point before this hardening. Mitigations:
 
 | Symptom                                              | Action                                                                        |
 |------------------------------------------------------|-------------------------------------------------------------------------------|
-| `pnpm doctor` says port :7000 occupied by foreign PID | `pnpm stop:all` (uses our PID file). If that fails: `taskkill /F /PID <n>`.   |
+| `pnpm doctor` says port :7000 occupied by foreign PID | `pnpm ports`; if foreign, do not kill blindly. Stop the owning app or change `MASTER_PORT`. |
+| Dashboard/API looks like old code                     | `pnpm status`, `pnpm ports`, `pnpm close:all`, then `pnpm start:all`.         |
 | `pnpm start:all` hangs at "Waiting for master /health" | `Get-Content .runtime\master.err.log -Tail 40`. Common: bad `DATABASE_URL`.   |
 | Profiles stuck `in_use` after crash                  | `pnpm reset:profiles` (or just restart master — it auto-recovers on startup). |
 | `JobTimeout` errors in list-orders                   | Increase `watchSeconds` budget OR check GPM Login UI for stuck profiles.      |
@@ -202,8 +229,10 @@ scripts/windows/
 ├── doctor.ps1           pre-flight
 ├── start.ps1            spawn detached compiled master + worker
 ├── stop.ps1             graceful then force tree-kill, scoped to this worktree
+├── close.ps1            hard close all repo-owned runtime processes
 ├── restart.ps1          stop + start
 ├── status.ps1           one-screen overview
+├── ports.ps1            netstat-backed port diagnostics
 └── reset-profiles.ps1   wraps /admin/reset-stuck-profiles
 ├── create-shortcuts.ps1 creates desktop shortcuts
 ├── pm2-*.ps1            optional PM2 service-style helpers

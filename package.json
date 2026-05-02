@@ -7,39 +7,7 @@
   "scripts": {
     "build": "pnpm -r --if-present run build",
     "build:dashboard": "pnpm --filter @app/dashboard run build",
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-<<<<<<< C:/Users/Stephen Strange/CascadeProjects/tiktok-seeding/package.json
-    "build:server": "pnpm --filter @app/master run build && pnpm --filter @app/worker run build",
-=======
     "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
-=======
-    "build:server": "pnpm --filter @app/shared --filter @app/gpm-client --filter @app/tiktok-actions --filter @app/master --filter @app/worker run build",
->>>>>>> C:/Users/Stephen Strange/.windsurf/worktrees/tiktok-seeding/tiktok-seeding-3c3dd21a/package.json
     "typecheck": "pnpm -r --if-present run typecheck",
     "format": "biome format --write .",
     "lint": "biome lint .",

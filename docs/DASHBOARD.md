@@ -11,6 +11,8 @@ pnpm start:all
 
 Open <http://127.0.0.1:7000/dashboard/> and sign in with a local dashboard user.
 
+If the dashboard appears stale after an update, run `pnpm status` and `pnpm ports`. If the port owner is a repo-owned stale runtime, run `pnpm close:all` and then `pnpm start:all`. Do not kill unrelated processes blindly.
+
 The first registered user becomes `admin`. Later self-registered users become `user` accounts and may be `active` immediately or `pending` depending on `AUTH_REQUIRE_ADMIN_APPROVAL`.
 
 For development only, `pnpm start:all:dev` runs source services and `pnpm dashboard` starts the Vite dev server on `DASHBOARD_PORT` (default `5173`).

@@ -112,6 +112,8 @@ Write-Step "Release check: package exclusions ($($latestRelease.Name))"
 foreach ($rel in @(
   'apps\master\drizzle\0002_magenta_manta.sql',
   'scripts\windows\create-shortcuts.ps1',
+  'scripts\windows\close.ps1',
+  'scripts\windows\ports.ps1',
   'scripts\windows\pm2-start.ps1',
   'scripts\windows\pm2-stop.ps1',
   'scripts\windows\pm2-status.ps1',

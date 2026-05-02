@@ -1,17 +1,3 @@
-# scripts/windows/stop.ps1 --- gracefully stop master + worker for this worktree.
-#
-# Usage:  pnpm stop:all
-#   -OnlyMaster      stop only master
-#   -OnlyWorker      stop only worker
-#   -Force           skip graceful SIGINT, taskkill /F /T immediately
-#
-# Behavior:
-#   - Reads PID from .runtime\<name>.pid.
-#   - taskkill /T /PID <pid> kills the wrapper AND its children (pnpm --- tsx --- node).
-#   - Falls back to scanning for orphan node.exe processes whose CommandLine
-#     references this worktree path AND the relevant app, in case PID file is stale.
-#   - Removes PID files when done.
-
 [CmdletBinding()]
 param(
   [switch]$OnlyMaster,
@@ -21,81 +7,136 @@ param(
 
 . "$PSScriptRoot\_common.ps1"
 
-function Stop-AppByPidFile {
-  param([Parameter(Mandatory)][ValidateSet('master','worker')][string]$Name)
+$script:Killed = @()
+$script:Foreign = @()
+$script:Failed = @()
+$script:PidFilesRemoved = @()
 
-  $procId = Read-PidFromFile $Name
-  $killed = $false
-  if ($procId) {
-    if (Test-ProcessRunning $procId) {
-      Write-Step "Stopping $Name tree (PID $procId)"
-      # Use Stop-Process -Force to kill the tree (more reliable than taskkill /T)
-      try {
-        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 1
-      } catch {
-        # Ignore errors - process may already be gone
-      }
-      if (Test-ProcessRunning $procId) {
-        Write-Warn2 "$Name PID $procId still alive; orphan scan will handle it"
-      } else {
-        Write-Ok "$Name PID $procId stopped"
-        $killed = $true
-      }
-    } else {
-      Write-Warn2 "$Name PID file pointed at PID $procId which is not running (stale)"
-    }
-    Remove-PidFile $Name
-  } else {
-    Write-Warn2 "$Name PID file not found"
-  }
-  return $killed
+function Add-Killed {
+  param([string]$Kind, [int]$ProcessId)
+  $script:Killed += "$Kind PID $ProcessId"
 }
 
-function Stop-OrphanByCmdline {
-  <#
-  .SYNOPSIS Kill leftover node.exe processes from this worktree.
-  Useful when cmd.exe wrapper exited but its tsx-loaded node child kept running.
-  #>
-  param([Parameter(Mandatory)][ValidateSet('master','worker')][string]$Name)
-
-  $marker = "apps\$Name"
-  $worktreeMarker = $script:RepoRoot
-
-  $procs = Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
-    Where-Object {
-      $cmd = $_.CommandLine
-      $cmd -and $cmd.Contains($worktreeMarker) -and $cmd.Contains($marker)
-    }
-
-  foreach ($p in $procs) {
-    Write-Warn2 "Orphan $Name node.exe found PID=$($p.ProcessId); killing tree"
-    & taskkill.exe /F /T /PID $p.ProcessId 2>&1 | Out-Null
+function Remove-RuntimePidFile {
+  param([Parameter(Mandatory)][ValidateSet('master', 'worker')][string]$Name)
+  $path = Get-PidFile $Name
+  if (Test-Path $path) {
+    Remove-Item -Force $path
+    $script:PidFilesRemoved += $path
   }
-  if ($procs) { Start-Sleep -Seconds 1 }
+}
+
+function Stop-PidFileProcess {
+  param([Parameter(Mandatory)][ValidateSet('master', 'worker')][string]$Name)
+  $procId = Read-PidFromFile $Name
+  if (-not $procId) {
+    Write-Warn2 "$Name PID file not found"
+    return
+  }
+  $proc = Get-ProcessInfo $procId
+  if (-not $proc) {
+    Write-Warn2 "$Name PID file pointed at stale PID $procId"
+    Remove-RuntimePidFile $Name
+    return
+  }
+  if (-not (Test-RepoOwnedRuntimeProcess $proc)) {
+    Write-Warn2 "$Name PID $procId does not look repo-owned; left alone"
+    $script:Foreign += "$Name PID $procId"
+    return
+  }
+  Write-Step "Stopping $Name process tree PID $procId"
+  if (Stop-RepoRuntimeProcess $proc) {
+    Add-Killed $Name $procId
+    Remove-RuntimePidFile $Name
+  } else {
+    $script:Failed += "$Name PID $procId"
+  }
+}
+
+function Stop-OrphanRuntimeProcesses {
+  param([Parameter(Mandatory)][ValidateSet('master', 'worker')][string]$Name)
+  $markerSlash = "apps/$Name"
+  $markerBackslash = "apps\$Name"
+  $procs = Get-RepoRuntimeProcesses | Where-Object {
+    $cmd = [string]$_.CommandLine
+    $cmd.Contains($markerSlash) -or $cmd.Contains($markerBackslash)
+  }
+  foreach ($proc in $procs) {
+    Write-Step "Stopping orphan $Name runtime PID $($proc.ProcessId)"
+    if (Stop-RepoRuntimeProcess $proc) {
+      Add-Killed "$Name orphan" ([int]$proc.ProcessId)
+    } else {
+      $script:Failed += "$Name orphan PID $($proc.ProcessId)"
+    }
+  }
+}
+
+function Clear-RepoOwnedPort {
+  param([Parameter(Mandatory)][int]$Port)
+  $reports = @(Get-PortReport $Port)
+  if (-not $reports) {
+    Write-Ok "Port :$Port free"
+    return
+  }
+  foreach ($row in $reports) {
+    if ($row.RepoOwned) {
+      $proc = Get-ProcessInfo $row.ProcessId
+      Write-Step "Freeing port :$Port from repo-owned PID $($row.ProcessId)"
+      if (Stop-RepoRuntimeProcess $proc) {
+        Add-Killed "port :$Port" ([int]$row.ProcessId)
+      } else {
+        $script:Failed += "port :$Port PID $($row.ProcessId)"
+      }
+    } else {
+      Write-Warn2 "Port :$Port held by foreign PID $($row.ProcessId); left alone"
+      $script:Foreign += "port :$Port PID $($row.ProcessId)"
+    }
+  }
+}
+
+Write-Step 'Stopping TikTok Seeding runtime'
+
+if (-not $OnlyWorker) {
+  Stop-PidFileProcess 'master'
+  Stop-OrphanRuntimeProcesses 'master'
+}
+if (-not $OnlyMaster) {
+  Stop-PidFileProcess 'worker'
+  Stop-OrphanRuntimeProcesses 'worker'
 }
 
 if (-not $OnlyWorker) {
-  Stop-AppByPidFile 'master'
-  Stop-OrphanByCmdline 'master'
-  # Final: anything still on :7000 owned by us?
-  $port = Get-MasterPort
-  $owner = Get-PortOwner $port
-  if ($owner) {
-    $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$owner" -ErrorAction SilentlyContinue
-    $cmd = if ($proc) { $proc.CommandLine } else { '' }
-    if ($cmd -and $cmd.Contains($script:RepoRoot)) {
-      Write-Warn2 "Port :$port still held by our worktree PID $owner; killing"
-      & taskkill.exe /F /T /PID $owner 2>&1 | Out-Null
-    } else {
-      Write-Warn2 "Port :$port held by foreign PID $owner --- left alone"
-    }
+  foreach ($port in Get-RuntimePorts) {
+    Clear-RepoOwnedPort $port
   }
 }
 
-if (-not $OnlyMaster) {
-  Stop-AppByPidFile 'worker'
-  Stop-OrphanByCmdline 'worker'
+if (-not $OnlyWorker) { Remove-RuntimePidFile 'master' }
+if (-not $OnlyMaster) { Remove-RuntimePidFile 'worker' }
+
+Write-Host ''
+Write-Host '------ stop summary ------' -ForegroundColor Cyan
+if ($script:Killed) { $script:Killed | Sort-Object -Unique | ForEach-Object { Write-Ok "killed $_" } } else { Write-Ok 'no repo-owned runtime processes needed killing' }
+if ($script:PidFilesRemoved) { $script:PidFilesRemoved | Sort-Object -Unique | ForEach-Object { Write-Ok "removed PID file $_" } } else { Write-Ok 'no PID files removed' }
+foreach ($port in Get-RuntimePorts) {
+  $remaining = @(Get-PortReport $port)
+  if (-not $remaining) {
+    Write-Ok "port :$port free"
+  } else {
+    foreach ($row in $remaining) {
+      if ($row.RepoOwned) {
+        Write-Fail "port :$port still held by repo-owned PID $($row.ProcessId)"
+        $script:Failed += "port :$port PID $($row.ProcessId)"
+      } else {
+        Write-Warn2 "port :$port held by foreign PID $($row.ProcessId)"
+      }
+    }
+  }
+}
+if ($script:Foreign) { $script:Foreign | Sort-Object -Unique | ForEach-Object { Write-Warn2 "left alone $_" } }
+if ($script:Failed) {
+  $script:Failed | Sort-Object -Unique | ForEach-Object { Write-Fail "failed $_" }
+  exit 1
 }
 
 Write-Host ''

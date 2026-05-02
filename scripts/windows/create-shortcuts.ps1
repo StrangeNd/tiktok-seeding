@@ -11,8 +11,8 @@ function New-OperatorShortcut {
   $path = Join-Path $desktop "$Name.lnk"
   $shortcut = $shell.CreateShortcut($path)
   $shortcut.TargetPath = 'powershell.exe'
-  $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Location -LiteralPath '$RepoRoot'; $Command`""
-  $shortcut.WorkingDirectory = $RepoRoot
+  $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -Command `"Set-Location -LiteralPath '$($script:RepoRoot)'; $Command`""
+  $shortcut.WorkingDirectory = $script:RepoRoot
   $shortcut.IconLocation = 'powershell.exe,0'
   $shortcut.Save()
   Write-Host "Created $path"
@@ -21,6 +21,7 @@ function New-OperatorShortcut {
 New-OperatorShortcut -Name 'Start TikTok Seeding' -Command 'pnpm start:all; pause'
 New-OperatorShortcut -Name 'Stop TikTok Seeding' -Command 'pnpm stop:all; pause'
 New-OperatorShortcut -Name 'Restart TikTok Seeding' -Command 'pnpm restart:all; pause'
+New-OperatorShortcut -Name 'Close TikTok Seeding' -Command 'pnpm close:all; pause'
 New-OperatorShortcut -Name 'TikTok Seeding Logs' -Command 'pnpm logs; pause'
 New-OperatorShortcut -Name 'TikTok Seeding Backup' -Command 'pnpm backup; pause'
 
@@ -29,7 +30,7 @@ $url = Get-MasterBaseUrl
 $shortcut = $shell.CreateShortcut($dashboard)
 $shortcut.TargetPath = "$env:SystemRoot\System32\cmd.exe"
 $shortcut.Arguments = "/c start $url/dashboard/"
-$shortcut.WorkingDirectory = $RepoRoot
+$shortcut.WorkingDirectory = $script:RepoRoot
 $shortcut.Save()
 Write-Host "Created $dashboard"
 Write-Host 'Shortcuts created. No secrets were embedded.'

@@ -28,6 +28,19 @@ const app = Fastify({
   disableRequestLogging: env.NODE_ENV === 'production',
 });
 
+function normalizePath(path: string): string {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+}
+
+function isPublicAuthRoute(method: string, rawPath: string): boolean {
+  const path = normalizePath(rawPath);
+  return (
+    (method === 'POST' &&
+      (path === '/auth/register' || path === '/auth/login' || path === '/auth/logout')) ||
+    (method === 'GET' && path === '/auth/me')
+  );
+}
+
 // Sensible defaults: app.httpErrors helpers, ETag, etc.
 await app.register(sensible);
 
@@ -41,17 +54,10 @@ await app.register(cors, {
 });
 
 app.addHook('onRequest', async (req, reply) => {
-  const path = req.url.split('?')[0] ?? '';
+  const path = normalizePath(req.url.split('?')[0] ?? '');
   if (path === '/health' || path === '/health/deep') return;
   if (isDashboardAssetRequest(req.method, path)) return;
-  if (
-    path === '/auth/register' ||
-    path === '/auth/login' ||
-    path === '/auth/logout' ||
-    path === '/auth/me'
-  ) {
-    return;
-  }
+  if (isPublicAuthRoute(req.method, path)) return;
   // Allow CORS preflight to pass through unauthenticated.
   if (req.method === 'OPTIONS') return;
   const key = req.headers['x-api-key'];

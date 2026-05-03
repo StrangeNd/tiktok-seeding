@@ -318,6 +318,7 @@ Security notes:
   track of — handle manually inside the GPM UI for now.
 - Cross-worktree process discovery — `pnpm stop:all` is intentionally scoped
   to this worktree only, so other Cascade sessions are never disturbed.
-- TikTok login / re-auth end-to-end. The dashboard can retrieve a mailbox code
-  for an owned account after a manual click, but it never submits that code or
-  automates platform login/bypass flows.
+- Bulk re-auth from the dashboard. Auto-login is driven by the worker pipeline
+  per-job (see `docs/DASHBOARD.md` → "Worker auto-login"); the dashboard itself
+  still does not expose a one-click "re-login this account" button or any
+  bypass flow on top of TikTok platform controls.

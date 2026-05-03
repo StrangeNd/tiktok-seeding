@@ -108,10 +108,41 @@ What it does:
 
 What it does **not** do:
 
-- It does not automate TikTok login.
-- It does not submit codes anywhere.
+- It does not submit codes anywhere from the dashboard UI.
 - It does not bypass platform controls.
 - It does not expose OAuth tokens, passwords, cookies, proxy credentials, or full email bodies.
+
+## Worker auto-login
+
+When a worker picks up a `live_view` job and discovers that the GPM browser
+profile is not logged into TikTok (cookie missing or expired), it drives a
+non-interactive login flow on the same browser session before running the
+actual action:
+
+1. Worker probes `https://www.tiktok.com` and inspects the DOM for a profile
+   avatar vs. a "Log in" CTA.
+2. If logged out, worker calls master's API-key-gated
+   `GET /internal/accounts/:id/login-credentials`. Master decrypts the
+   `secret_blob` in memory and returns `username` / `password` (plus the
+   imported cookie if any). This route is **never** reachable from the
+   dashboard session — only from the worker, by `MASTER_API_KEY`.
+3. Worker navigates to `/login/phone-or-email/email`, fills the form with
+   randomised humanlike delays, and submits.
+4. If TikTok asks for a verification code, the worker waits a few seconds for
+   the email to arrive and calls
+   `POST /internal/accounts/:id/mail-code` (which wraps the same
+   `getLatestCodeForAccount` path the dashboard's "Get mail code" button
+   uses), then types the code and submits.
+5. Worker reports the outcome via
+   `PATCH /internal/accounts/:id/login-result`. Master updates
+   `cookie_status` to `present` on success, `needs_reauth` on captcha / 2FA
+   failures, or `dead` after exhausting retries with a hard credential error.
+6. On any failure, the job ends with `LoginFailed`, `TwoFAFailed`, or
+   `TikTokCaptcha` and the operator can inspect `last_error` from the
+   account detail page.
+
+The retry budget is small (max 2 attempts) and operations are bounded by the
+job's hard timeout so a stuck profile cannot starve the queue.
 
 ## Mail configuration
 

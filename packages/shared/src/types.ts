@@ -57,6 +57,10 @@ export const ErrorCode = {
   NavigationTimeout: 'NavigationTimeout',
   TikTokCaptcha: 'TikTokCaptcha',
   AccountLoggedOut: 'AccountLoggedOut',
+  /** Auto-login attempt failed (wrong password, account suspended, DOM unexpected, ...). */
+  LoginFailed: 'LoginFailed',
+  /** 2FA / mail-code submission failed (code expired, wrong code, mailbox empty). */
+  TwoFAFailed: 'TwoFAFailed',
   ProxyDead: 'ProxyDead',
   /** Job exceeded overall hard timeout (watchSeconds + nav + cleanup buffer). */
   JobTimeout: 'JobTimeout',

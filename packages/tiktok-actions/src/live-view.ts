@@ -39,8 +39,9 @@ const CAPTCHA_SELECTORS = [
 
 /**
  * Action: mở 1 URL TikTok và "watch" trong N giây.
- * KHÔNG login — Phase 1 chỉ test browser pipeline.
- * Phase 2+ sẽ thêm: kiểm tra cookie session, scroll FYP, click follow, comment...
+ * Caller (job-runner) đảm bảo session đã login trước khi gọi: hoặc cookie GPM
+ * còn valid, hoặc auto-login đã chạy thành công (xem `tiktok-login.ts`).
+ * Phase 2+ sẽ thêm: scroll FYP, click follow, comment...
  */
 export async function liveView(page: Page, opts: LiveViewOptions): Promise<LiveViewResult> {
   const navTimeout = opts.navTimeoutMs ?? 60_000;
